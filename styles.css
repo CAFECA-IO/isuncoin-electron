@@ -1,0 +1,92 @@
+/* styles.css */
+body {
+  font-family: 'Arial', sans-serif;
+  background-color: #f0f0f0;
+  padding: 20px;
+}
+
+h1 {
+  color: #333;
+}
+
+button {
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  padding: 10px 60px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-left: 20px;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+input[type="text"] {
+  width: 500px;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
+
+#error {
+  color: #dc3545;
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+textarea {
+  margin-top: 20px;
+  width: 97%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.2;
+  resize: vertical;
+  background-color: #ffffff;
+  color: #333333;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
+
+.log-title {
+  margin-bottom: 10px;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.log-info {
+  color: #28a745;
+}
+
+.log-error {
+  color: #dc3545;
+}
+
+.log-warning {
+  color: #ffc107;
+}
+
+.log-debug {
+  color: #17a2b8;
+}
+
+.log-line {
+  border-bottom: 1px solid #ccc;
+  margin: 10px 0;
+}

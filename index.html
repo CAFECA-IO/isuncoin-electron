@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>iSunCoin</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+  </head>
+  <body>
+    <h1>錢包地址</h1>
+    <input type="text" id="address" placeholder="輸入挖礦獎勵錢包地址">
+    <button onClick="startMining()"><i class="fas fa-play"></i> 啟動挖礦</button>
+    <div id="error"></div>
+    <textarea id="log" rows="23" readonly></textarea>
+    <script src="renderer.js"></script>
+  </body>
+</html>

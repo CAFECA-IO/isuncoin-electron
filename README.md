@@ -1,2 +1,2 @@
-# isuncoin-electron
+# iSunCoin Electron
 iSunCoin AI Blockchain Desktop Application
