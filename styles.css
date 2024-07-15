@@ -11,12 +11,14 @@ h1 {
 
 button {
   background-color: #007bff;
+  position: absolute;
+  right: 50px;
   color: #fff;
   border: none;
-  padding: 10px 60px;
   cursor: pointer;
   transition: background-color 0.3s ease;
-  margin-left: 20px;
+  line-height: 3em;
+  padding: 0px 50px;
 }
 
 button:hover {
@@ -39,10 +41,30 @@ input[type="text"] {
   height: 100vh;
 }
 
-#error {
-  color: #dc3545;
+#message {
+  color: #555;
   font-size: 12px;
   margin-top: 10px;
+  padding-left: 10px;
+}
+/* message after element ... infinite loop animation */
+#message:after {
+  content: '...';
+  animation: dots 1s steps(5, end) infinite;
+}
+@keyframes dots {
+  0%, 20% {
+    color: #ccc;
+  }
+  40% {
+    color: #aaa;
+  }
+  60% {
+    color: #333;
+  }
+  80%, 100% {
+    color: #999;
+  }
 }
 
 textarea {
@@ -89,4 +111,14 @@ textarea:focus {
 .log-line {
   border-bottom: 1px solid #ccc;
   margin: 10px 0;
+}
+
+div.sub {
+  position: absolute;
+  top: 20px;
+  right: 50px;
+}
+
+div.sub > h1, h2, h3, h4, h5 {
+  display: inline-block;
 }
