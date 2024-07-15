@@ -376,7 +376,8 @@ const getBalance = async () => {
   const method = 'eth_getBalance';
   const params = [etherbase, 'latest'];
   const result = await requestIsunCoinAPI(method, params);
-  const bn = BigInt(result.result);
+  const ns = result.result || '0x0';
+  const bn = BigInt(ns);
   const bns = bn.toString(10);
   let balance = '0';
   if(bns.length > 18) {
