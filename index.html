@@ -6,11 +6,21 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
   </head>
   <body>
-    <h1>錢包地址</h1>
-    <input type="text" id="address" placeholder="輸入挖礦獎勵錢包地址">
-    <button onClick="startMining()"><i class="fas fa-play"></i> 啟動挖礦</button>
-    <div id="error"></div>
-    <textarea id="log" rows="23" readonly></textarea>
+    <div class="main">
+      <h1>錢包地址</h1>
+      <input type="text" id="address" placeholder="輸入挖礦獎勵錢包地址">
+      <button onClick="startMining()"><i class="fas fa-play"></i> 啟動挖礦</button>
+      <div id="message">iSunCoin 初始化</div>
+      <textarea id="log" rows="20" readonly></textarea>
+    </div>
+    <div class="sub">
+      <h2 id="balance">--</h2>
+      <h4>ISC</h4>
+    </div>
+    <div class="version">
+      <!-- get version number from package.json -->
+      iSunCoin <span id="version">載入中</div>
+    </div>
     <script src="renderer.js"></script>
   </body>
 </html>
