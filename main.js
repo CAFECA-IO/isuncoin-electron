@@ -5,6 +5,9 @@ const fs = require('fs');
 const { start } = require('repl');
 const axios = require('axios');
 const { clear } = require('console');
+const { version } = require('os');
+
+const packageInfo = require('./package.json');
 
 let mainWindow;
 let isuncoinProcess;
@@ -428,7 +431,9 @@ const saveConfig = async (config) => {
 
 const loadConfig = async () => {
   const configPath = path.join(datadir, 'iSunCoin', 'config.json');
+  
   let result = {};
+
   try {
     const rawConfig = fs.readFileSync(configPath);
     result = JSON.parse(rawConfig);
@@ -437,5 +442,6 @@ const loadConfig = async () => {
       etherbase = address;
     }
   } catch (error) {}
+  result.version = `v${packageInfo.version}`;
   return result;
 }

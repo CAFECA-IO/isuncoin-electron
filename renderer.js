@@ -28,7 +28,9 @@ function isValidEthereumAddress(address) {
 ipcRenderer.on('isuncoin-config', (event, config) => {
   const data = JSON.parse(config);
   const address = data.address;
+  const version = data.version;
 
+  document.getElementById('version').textContent = version;
   if(isValidEthereumAddress(address)) {
     document.getElementById('address').value = address;
   }
