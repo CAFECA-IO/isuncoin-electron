@@ -12,12 +12,62 @@ const packageInfo = require('./package.json');
 let mainWindow;
 let isuncoinProcess;
 let isuncoinInterval;
+let registerInterval;
 let isMining = false;
 let tryMining = false;
 let etherbase;
 const homeDir = app.getPath('home');
 const isuncoinPath = path.join(__dirname, '/../extra/', 'isuncoin');
 const datadir = path.join(homeDir, 'isuncoin-miner');
+
+const isTextBuffer = (buffer) => {
+  try {
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+    return true; // 成功解碼，表示是有效的文字
+  } catch (e) {
+    return false; // 解碼過程中出錯，表示不是有效的文字
+  }
+}
+
+const getComputingPower = async () => {
+  // 設定運行時間限制為 1 秒（1000 毫秒）
+  const timeLimit = 1000;
+
+  const isPrime = (n) => {
+    if (n <= 1n) return false;
+    if (n <= 3n) return true;
+    if (n % 2n === 0 || n % 3n === 0) return false;
+    let i = 5n;
+    while (i * i <= n) {
+      if (n % i === 0n || n % (i + 2n) === 0n) return false;
+      i += 6n;
+    }
+    return true;
+  };
+  
+  const findPrimesWithTimeLimit = (timeLimit) => {
+    const primes = [];
+    let num = 10n ** 12n + 1n; // Start searching from the number just above 10^18
+    const startTime = Date.now();
+  
+    while (Date.now() - startTime < timeLimit) {
+      if (isPrime(num)) {
+        primes.push(num);
+      }
+      num += 1n;
+    }
+  
+    return primes;
+  };
+
+  // 計時開始並執行搜尋
+  const primes = findPrimesWithTimeLimit(timeLimit);
+
+  // primes.length 開根號乘以 10 無條件進位即為計算能力
+  const computingPower = Math.ceil(Math.sqrt(primes.length) * 10);
+  
+  return computingPower;
+};
 
 const createWindow = async () => {
   mainWindow = new BrowserWindow({
@@ -31,8 +81,8 @@ const createWindow = async () => {
   });
 
   mainWindow.loadFile('index.html');
-  mainWindow.on('closed', () => {
-    stopIsuncoin();
+  mainWindow.on('closed', async () => {
+    await stopIsuncoin();
     mainWindow = null;
     app.quit();
   });  
@@ -48,8 +98,8 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('window-all-closed', () => {
-  stopIsuncoin();
+app.on('window-all-closed', async () => {
+  await stopIsuncoin();
   mainWindow = null;
   app.quit();
 });
@@ -75,6 +125,7 @@ const initialIsuncoin = async () => {
   mainWindow?.webContents.send('message', '初始化完成，請設定錢包地址並點擊「開始挖礦」按鈕開始挖礦');
 
   await updateBalance();
+  await updateComputingPower();
 
   return process;
 }
@@ -86,13 +137,17 @@ const startIsuncoin = async () => {
     isuncoinProcess = spawn(command, [], { shell: true });
     
     isuncoinProcess.stdout.on('data', (data) => {
-      const rawData = data.toString();
-      mainWindow?.webContents.send('isuncoin-stdout', rawData);
+      if (isTextBuffer(data)) {
+        const rawData = data.toString();
+        mainWindow?.webContents.send('isuncoin-stdout', rawData);
+      }
     });
   
     isuncoinProcess.stderr.on('data', (data) => {
-      const rawData = data.toString();
-      mainWindow?.webContents.send('isuncoin-stderr', rawData);
+      if (isTextBuffer(data)) {
+        const rawData = data.toString();
+        mainWindow?.webContents.send('isuncoin-stderr', rawData);
+      }
     });
   
     isuncoinProcess.on('close', (code) => {
@@ -117,6 +172,10 @@ const stopIsuncoin = async () => {
   // console.log('stopIsuncoin');
   try {
     clearInterval(isuncoinInterval);
+    clearInterval(registerInterval);
+    const windowsCommand = 'taskkill /f /im isuncoin.exe';
+    spawn(windowsCommand, [], { shell: true });
+    await new Promise((resolve) => setTimeout(resolve, 2000));
   } catch (error) {}
 
   if (isuncoinProcess) {
@@ -162,9 +221,11 @@ const ensureSync = async () => {
   // console.log('ensureSync');
   try {
     clearInterval(isuncoinInterval);
+    clearInterval(registerInterval);
   } catch (error) {}
 
   isuncoinInterval = setInterval(coordinate, 10000);
+  registerInterval = setInterval(registerPeer, 3600000);
   return isuncoinInterval;
 }
 
@@ -178,6 +239,7 @@ const coordinate = async () => {
   } catch (error) {}
 
   // if connect peer = 0
+  /*
   if (keepGo) {
     try {
       const peerCount = await getPeerCount();
@@ -192,6 +254,7 @@ const coordinate = async () => {
       keepGo = false;
     }
   }
+  */
 
   // if local target block hash is not equal to remote target block hash
   if (keepGo) {
@@ -263,6 +326,27 @@ const resetFolder = async () => {
     });
   } catch (error) {}
 }
+
+const getPeer = async () => {
+  // console.log('getPeer');
+  const command = `${isuncoinPath} --datadir ${datadir} attach --exec "admin.nodeInfo.enode"`;
+  const enodeRaw = await promiseCommand(command) + ":" + etherbase;
+  const peer = enodeRaw.replace(/\n/g, '').replace(/"/g, '');
+  return peer;
+}
+
+const registerPeer = async () => {
+  // console.log('registerPeer');
+  const peer = await getPeer();
+  console.log(peer);
+  // post peer to https://isuncoin.com/api/vi/peer
+  const url = 'https://isuncoin.com/api/v1/peer';
+  const data = { peer };
+  const response = await axios.post(url, data);
+  const result = response.data;
+  return result;
+}
+
 
 const getPeerCount = async () => {
   // console.log('getPeerCount');
@@ -370,6 +454,12 @@ const updateBalance = async () => {
   // console.log('updateBalance');
   const balance = await getBalance();
   mainWindow?.webContents.send('balance', balance);
+}
+
+const updateComputingPower = async () => {
+  // console.log('updateComputingPower');
+  const computingPower = await getComputingPower();
+  mainWindow?.webContents.send('computing-power', computingPower);
 }
 
 const getBalance = async () => {

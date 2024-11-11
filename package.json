@@ -1,6 +1,6 @@
 {
   "name": "isuncoin",
-  "version": "1.12.0",
+  "version": "1.12.1",
   "description": "iSunCoin AI Blockchain Desktop Application",
   "main": "main.js",
   "scripts": {

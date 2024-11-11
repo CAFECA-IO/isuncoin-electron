@@ -52,6 +52,10 @@ ipcRenderer.on('balance', (event, data) => {
   document.getElementById('balance').textContent = data;
 });
 
+ipcRenderer.on('computing-power', (event, data) => {
+  document.getElementById('computing-power').textContent = data;
+});
+
 ipcRenderer.on('isuncoin-close', (event, code) => {
   // writeToLog(`iSunCoin 意外關閉: ${code}`);
 });
