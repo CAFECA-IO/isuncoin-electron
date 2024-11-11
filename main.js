@@ -330,7 +330,7 @@ const resetFolder = async () => {
 const getPeer = async () => {
   // console.log('getPeer');
   const command = `${isuncoinPath} --datadir ${datadir} attach --exec "admin.nodeInfo.enode"`;
-  const enodeRaw = await promiseCommand(command) + ":" + etherbase;
+  const enodeRaw = await promiseCommand(command);
   const peer = enodeRaw.replace(/\n/g, '').replace(/"/g, '');
   return peer;
 }
@@ -338,10 +338,12 @@ const getPeer = async () => {
 const registerPeer = async () => {
   // console.log('registerPeer');
   const peer = await getPeer();
-  console.log(peer);
+  const address = etherbase;
+  const version = `v${packageInfo.version}`;
+  const computingPower = await getComputingPower();
   // post peer to https://isuncoin.com/api/vi/peer
   const url = 'https://isuncoin.com/api/v1/peer';
-  const data = { peer };
+  const data = { peer, address, version, computingPower };
   const response = await axios.post(url, data);
   const result = response.data;
   return result;
