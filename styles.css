@@ -120,6 +120,12 @@ div.sub {
   right: 50px;
 }
 
+div.sub.cp {
+  position: absolute;
+  top: 50px;
+  right: 50px;
+}
+
 div.sub > h1, h2, h3, h4, h5 {
   display: inline-block;
 }
