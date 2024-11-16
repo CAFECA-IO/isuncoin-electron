@@ -2,7 +2,11 @@
 iSunCoin AI Blockchain Desktop Application
 
 ## Build Linux GUI
-- to be develop
+- [Build Linux Binary: isuncoin](https://github.com/CAFECA-IO/isuncoin/tree/develop?tab=readme-ov-file#building-linux-binary)
+- put isuncoin to extra folder
+- npm run build:linux
+- file: dist/isuncoin-1.12.1.AppImage
+- chmod +x dist/isuncoin-1.12.1.AppImage
 
 ## Build Mac GUI
 - [Build Mac Binary: isuncoin](https://github.com/CAFECA-IO/isuncoin/tree/develop?tab=readme-ov-file#building-mac-binary)
