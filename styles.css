@@ -13,7 +13,7 @@ h1 {
 button {
   background-color: #007bff;
   position: absolute;
-  right: 50px;
+  right: 60px;
   color: #fff;
   border: none;
   cursor: pointer;
@@ -24,6 +24,18 @@ button {
 
 button:hover {
   background-color: #0056b3;
+}
+
+button.reset {
+  cursor: pointer;
+  align-items: center;
+  right: 20px;
+  padding: 0px 10px;
+  line-height: 3em;
+}
+
+button.hide {
+  display: none;
 }
 
 input[type="text"] {

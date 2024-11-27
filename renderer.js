@@ -1,6 +1,10 @@
 const { ipcRenderer } = require('electron');
 
 function startMining() {
+  // 隱藏開始挖礦按鈕，顯示停止挖礦按鈕，使用 hide class 隱藏元素
+  document.getElementById('start-mining').classList.add('hide');
+  document.getElementById('stop-mining').classList.remove('hide');
+
   const messageElement = document.getElementById('message');
   const address = document.getElementById('address').value;
   if (!isValidEthereumAddress(address)) {
@@ -11,6 +15,18 @@ function startMining() {
   messageElement.textContent = ''; // 清空錯誤訊息
 
   ipcRenderer.send('start-mining', address);
+}
+
+function stopMining() {
+  // 隱藏停止挖礦按鈕，顯示開始挖礦按鈕
+  document.getElementById('stop-mining').classList.add('hide');
+  document.getElementById('start-mining').classList.remove('hide');
+
+  ipcRenderer.send('stop-mining');
+}
+
+function reset() {
+  ipcRenderer.send('reset');
 }
 
 function writeToLog(message) {

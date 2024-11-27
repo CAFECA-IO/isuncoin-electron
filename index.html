@@ -9,7 +9,9 @@
     <div class="main">
       <h1>錢包地址</h1>
       <input type="text" id="address" placeholder="輸入挖礦獎勵錢包地址">
-      <button onClick="startMining()"><i class="fas fa-play"></i> 啟動挖礦</button>
+      <button id="start-mining" onClick="startMining()" class="start"><i class="fas fa-play"></i> 啟動挖礦</button>
+      <button id="stop-mining" onClick="stopMining()" class="stop hide"><i class="fas fa-pause"></i> 停止挖礦</button>
+      <button onClick="reset()" type="reset" class="reset"><i class="fas fa-undo"></i></button>
       <div id="message">iSunCoin 初始化</div>
       <textarea id="log" rows="20" readonly></textarea>
     </div>
