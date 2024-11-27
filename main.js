@@ -115,6 +115,13 @@ ipcMain.on('start-mining', async (event, address) => {
   await startMining();
 });
 
+ipcMain.on('stop-mining', async (event, address) => {
+  await stopMining();
+});
+
+ipcMain.on('reset', async (event) => {
+  await reset();
+});
 
 /** iSunCoin command */
 const initialIsuncoin = async () => {
@@ -214,7 +221,7 @@ const stopMining = async () => {
     await promiseCommand(command);
     isMining = false;
   }
-  mainWindow?.webContents.send('message', '挖礦已終止，請點擊「開始挖礦」按鈕重新開始');
+  mainWindow?.webContents.send('message', '挖礦已暫停，請點擊「開始挖礦」按鈕重新開始');
 }
 
 const ensureSync = async () => {
