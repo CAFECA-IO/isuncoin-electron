@@ -1,8 +1,10 @@
-import { app, BrowserWindow, ipcMain, protocol, net } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, net, Tray, Menu, nativeImage } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
 import * as si from 'systeminformation';
+
+let appTray: Tray | null = null;
 
 // Register privileged scheme for FIDO2/Secure Context
 protocol.registerSchemesAsPrivileged([
@@ -29,37 +31,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   ipcMain.handle('get-flops', async () => {
-    return new Promise((resolve, reject) => {
-      // Info: (20251213 - AI) isuncoin binary is in extra/ relative to project root
-      // Info: (20251213 - AI) __dirname is now dist/. We need to go up one level.
-      const isuncoinPath = path.join(__dirname, '..', 'extra', 'isuncoin');
-      const process = spawn(isuncoinPath, ['flops']);
-
-      let output = '';
-      let error = '';
-
-      process.stdout.on('data', (data) => {
-        output += data.toString();
-      });
-
-      process.stderr.on('data', (data) => {
-        error += data.toString();
-      });
-
-      process.on('close', (code) => {
-        if (code !== 0) {
-          console.error(`Process exited with code ${code}. Error: ${error}`);
-          resolve({ success: false, error: error || `Process exited with code ${code}` });
-        } else {
-          resolve({ success: true, data: output.trim() });
-        }
-      });
-
-      process.on('error', (err) => {
-        console.error('Failed to start subprocess.', err);
-        resolve({ success: false, error: err.message });
-      });
-    });
+    return await runFlopsBenchmark();
   });
 
   ipcMain.handle('check-docker', async () => {
@@ -279,8 +251,96 @@ app.whenReady().then(() => {
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+
+  // Tray Logic
+  const initTray = async () => {
+    const iconPath = path.join(__dirname, '../src/assets/icon.png');
+    // Resize for tray if needed, but nativeImage handles high-dpi mostly. 
+    // Ideally use a smaller template image for macOS, but original icon is okay for MVP.
+    const trayIcon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+
+    appTray = new Tray(trayIcon);
+    appTray.setToolTip('iSunCloud Gateway');
+
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Open Dashboard', click: () => {
+          const wins = BrowserWindow.getAllWindows();
+          if (wins.length === 0) {
+            createWindow();
+          } else {
+            wins[0].show();
+            wins[0].focus();
+          }
+        }
+      },
+      { type: 'separator' },
+      { label: 'Quit', role: 'quit' }
+    ]);
+    // appTray.setContextMenu(contextMenu); // Optional: if we want right-click menu. User asked for "Click to launch", usually left click.
+
+    appTray.on('click', () => {
+      const wins = BrowserWindow.getAllWindows();
+      if (wins.length === 0) {
+        createWindow();
+      } else {
+        wins[0].show();
+        wins[0].focus();
+      }
+    });
+
+    // Polling for Tooltip
+    const updateTooltip = async () => {
+      const result = await runFlopsBenchmark();
+      if (result.success && result.data) {
+        const match = result.data.match(/Total Compute Power:\s*([\d.]+)\s*TFLOPS/);
+        const flops = match ? `${match[1]} TFLOPS` : 'Unknown';
+        appTray?.setToolTip(`Computing Power: ${flops}`);
+      }
+    };
+
+    updateTooltip();
+    setInterval(updateTooltip, 60000); // Update every minute
+  };
+
+  initTray();
 });
 
+// Helper for FLOPs
+const runFlopsBenchmark = async () => {
+  return new Promise<{ success: boolean, data?: string, error?: string }>((resolve) => {
+    let binaryPath = path.join(__dirname, '../extra/isuncoin');
+    if (process.env.NODE_ENV === 'production' || app.isPackaged) {
+      binaryPath = path.join(process.resourcesPath, 'extra/isuncoin');
+    }
+
+    if (process.platform !== 'win32') {
+      try {
+        require('child_process').execSync(`chmod +x "${binaryPath}"`);
+      } catch (e) { }
+    }
+
+    const processProc = spawn(binaryPath, ['flops']);
+    let output = '';
+    let error = '';
+
+    processProc.stdout.on('data', (data) => output += data.toString());
+    processProc.stderr.on('data', (data) => error += data.toString());
+
+    processProc.on('close', (code) => {
+      if (code !== 0) {
+        resolve({ success: false, error: error || `Exited with ${code}` });
+      } else {
+        resolve({ success: true, data: output.trim() });
+      }
+    });
+    processProc.on('error', (err) => resolve({ success: false, error: err.message }));
+  });
+};
+
 app.on('window-all-closed', function () {
-  if (process.platform !== 'darwin') app.quit();
+  // Do not quit on Mac when windows close, keep tray active
+  // if (process.platform !== 'darwin') app.quit(); 
+  // User wants tray persistent, so we shouldn't quit even on non-mac?
+  // Standard electron behavior for tray apps is usually to stay open.
 });
