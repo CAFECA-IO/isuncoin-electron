@@ -1,28 +1,30 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, net } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
 import * as si from 'systeminformation';
+
+// Register privileged scheme for FIDO2/Secure Context
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'app', privileges: { secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }
+]);
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'), // Info: (20251213 - AI) compiled preload will be in same dir as main.js
+      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      webSecurity: true
     },
     title: 'iSunCloud',
-    // Info: (20251214 - AI) Loading icon from src/assets (or wherever it ends up in dist, but for now referencing source if running via electron locally or copy it)
-    // Actually, we should check if electron-builder handles this, or point to extraResources.
-    // For Dev, src path is fine if existing. For Prod, we might need a better strategy.
     icon: path.join(__dirname, '../src/assets/icon.png')
   });
 
-  // Info: (20251213 - AI) Since main.js is in dist/, index.html is in dist_renderer/
-  mainWindow.loadFile(path.join(__dirname, '../dist_renderer/index.html'));
-  // Info: (20251213 - AI) mainWindow.webContents.openDevTools();
+  // Serve via custom protocol to ensure Secure Context for WebAuthn
+  mainWindow.loadURL('app://./index.html');
 }
 
 app.whenReady().then(() => {
@@ -260,6 +262,16 @@ app.whenReady().then(() => {
         runProcess.on('error', (err) => resolve({ success: false, error: err.message }));
       });
     });
+  });
+
+  // Handle Custom Protocol
+  protocol.handle('app', (req) => {
+    const url = req.url.replace('app://./', '').split('?')[0]; // Strip scheme
+    // If it's the root index.html
+    const filename = url === 'index.html' ? 'index.html' : url;
+    const filePath = path.join(__dirname, '../dist_renderer', filename);
+
+    return net.fetch('file://' + filePath);
   });
 
   createWindow();

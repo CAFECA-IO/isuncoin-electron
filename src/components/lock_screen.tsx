@@ -12,6 +12,8 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
   const [isRegistered, setIsRegistered] = useState(false);
   const [error, setError] = useState('');
 
+  const [version, setVersion] = useState('v0.0.0');
+
   useEffect(() => {
     const credId = localStorage.getItem('fido_cred_id');
     if (credId) {
@@ -21,6 +23,14 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
       setIsRegistered(false);
       setStatus('Setup Secure Access');
     }
+
+    const fetchVersion = async () => {
+      if (typeof window !== 'undefined' && (window as any).electronAPI) {
+        const ver = await (window as any).electronAPI.getIsuncoinVersion();
+        setVersion(ver);
+      }
+    };
+    fetchVersion();
   }, []);
 
   // Helpers for ArrayBuffer conversion
@@ -199,7 +209,7 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
       </div>
 
       <div style={{ marginTop: '2rem', opacity: 0.3, fontSize: '0.8rem' }}>
-        iSunCloud Secure Gateway v1.0
+        iSunCloud {version}
       </div>
     </div>
   );
