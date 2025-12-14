@@ -62,13 +62,20 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
       const credential = await navigator.credentials.create({
         publicKey: {
           challenge: challenge,
-          rp: { name: 'iSunCloud Local', id: window.location.hostname }, // hostname usually 'localhost' or empty in electron file. May need tweak if file://
+          rp: { name: 'iSunCloud Gateway' }, // ID defaults to origin (isuncoin.local)
           user: {
             id: Uint8Array.from('admin', c => c.charCodeAt(0)),
             name: 'admin@isuncoin.com',
             displayName: 'Admin User'
           },
-          pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
+          pubKeyCredParams: [
+            { alg: -7, type: 'public-key' }, // ES256
+            { alg: -257, type: 'public-key' } // RS256
+          ],
+          authenticatorSelection: {
+            userVerification: 'preferred',
+            residentKey: 'preferred',
+          },
           timeout: 60000,
           attestation: 'none'
         }
@@ -80,9 +87,10 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
         setStatus('Registration Successful');
         setTimeout(onUnlock, 1000);
       }
+
     } catch (e: any) {
-      console.error(e);
-      setError('Registration Failed: ' + (e.message || 'Unknown Error'));
+      console.error('FIDO2 Registration Error:', e);
+      setError(`Registration Failed: ${e.message || e.name}`);
       setStatus('Setup Failed');
     }
   };
@@ -113,6 +121,7 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
         setStatus('Unlocked');
         setTimeout(onUnlock, 500);
       }
+
     } catch (e: any) {
       console.error(e);
       setError('Unlock Failed: ' + (e.message || 'Unknown Error'));

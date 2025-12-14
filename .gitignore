@@ -17,6 +17,7 @@
 /build
 /dist
 /dist_renderer
+/dist_electron
 
 # extra files
 /extra

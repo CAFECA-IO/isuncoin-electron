@@ -7,9 +7,7 @@ import * as si from 'systeminformation';
 let appTray: Tray | null = null;
 
 // Register privileged scheme for FIDO2/Secure Context
-protocol.registerSchemesAsPrivileged([
-  { scheme: 'app', privileges: { secure: true, standard: true, supportFetchAPI: true, corsEnabled: true } }
-]);
+// https is already privileged, so we don't need to register it manually for 'secure' status.
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -25,8 +23,27 @@ function createWindow() {
     icon: path.join(__dirname, '../src/assets/icon.png')
   });
 
-  // Serve via custom protocol to ensure Secure Context for WebAuthn
-  mainWindow.loadURL('app://./index.html');
+  // Auto-grant permissions for local device access if needed
+  mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    const url = webContents.getURL();
+    if (url.startsWith('https://isuncoin.local/')) {
+      return callback(true);
+    }
+    callback(false);
+  });
+
+  // Apply a custom certificate verification handler for our internal domain if needed
+  // (Not strictly needed for protocol.handle, but good practice if Electron checks)
+  mainWindow.webContents.session.setCertificateVerifyProc((request, callback) => {
+    if (request.hostname === 'isuncoin.local') {
+      callback(0); // Success
+    } else {
+      callback(-3); // Use default verification
+    }
+  });
+
+  // Serve via intercepted HTTPS to ensure Secure Context for WebAuthn and consistency
+  mainWindow.loadURL('https://isuncoin.local/index.html');
 }
 
 app.whenReady().then(() => {
@@ -236,14 +253,20 @@ app.whenReady().then(() => {
     });
   });
 
-  // Handle Custom Protocol
-  protocol.handle('app', (req) => {
-    const url = req.url.replace('app://./', '').split('?')[0]; // Strip scheme
-    // If it's the root index.html
-    const filename = url === 'index.html' ? 'index.html' : url;
-    const filePath = path.join(__dirname, '../dist_renderer', filename);
+  // Handle Custom Protocol (HTTPS Interception)
+  protocol.handle('https', (req) => {
+    const url = req.url;
+    if (url.startsWith('https://isuncoin.local/')) {
+      const pathName = url.replace('https://isuncoin.local/', '').split('?')[0];
+      const filename = pathName === '' || pathName === '/' ? 'index.html' : pathName;
+      // Basic protection against directory traversal (though unlikely with this logic)
+      if (filename.includes('..')) return new Response('Not Found', { status: 404 });
 
-    return net.fetch('file://' + filePath);
+      const filePath = path.join(__dirname, '../dist_renderer', filename);
+      return net.fetch('file://' + filePath);
+    }
+    // Passthrough other HTTPS requests
+    return net.fetch(req, { bypassCustomProtocolHandlers: true });
   });
 
   createWindow();
