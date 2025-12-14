@@ -3,11 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { Fingerprint, Lock, ShieldCheck } from 'lucide-react';
 
-interface LockScreenProps {
+interface ILockScreenProps {
   onUnlock: () => void;
 }
 
-const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
+const LockScreen: React.FC<ILockScreenProps> = ({ onUnlock }) => {
   const [status, setStatus] = useState('Checking Security...');
   const [isRegistered, setIsRegistered] = useState(false);
   const [error, setError] = useState('');
@@ -25,8 +25,8 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
     }
 
     const fetchVersion = async () => {
-      if (typeof window !== 'undefined' && (window as any).electronAPI) {
-        const ver = await (window as any).electronAPI.getIsuncoinVersion();
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        const ver = await window.electronAPI.getIsuncoinVersion();
         setVersion(ver);
       }
     };
@@ -45,10 +45,6 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
       bytes[i] = binaryString.charCodeAt(i);
     }
     return bytes.buffer;
-  };
-
-  const strToBuffer = (str: string) => {
-    return new TextEncoder().encode(str);
   };
 
   const handleRegister = async () => {
@@ -95,9 +91,10 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
         setTimeout(onUnlock, 1000);
       }
 
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('FIDO2 Registration Error:', e);
-      setError(`Registration Failed: ${e.message || e.name}`);
+      const err = e as Error;
+      setError(`Registration Failed: ${err.message || err.name}`);
       setStatus('Setup Failed');
     }
   };
@@ -136,9 +133,10 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
         setTimeout(onUnlock, 500);
       }
 
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      setError('Unlock Failed: ' + (e.message || 'Unknown Error'));
+      const err = e as Error;
+      setError('Unlock Failed: ' + (err.message || 'Unknown Error'));
       setStatus('Try Again');
     }
   };

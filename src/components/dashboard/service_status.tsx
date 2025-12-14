@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Settings, X, Save } from 'lucide-react';
+import { IDockerContainer } from '@/types';
 
 const ServiceStatus: React.FC = () => {
   const [services, setServices] = useState<string[]>([]);
-  const [containers, setContainers] = useState<any[]>([]);
-  const [version, setVersion] = useState<string>('Loading...');
+  const [containers, setContainers] = useState<IDockerContainer[]>([]);
+  // const [version, setVersion] = useState<string>('Loading...');
   const [balance, setBalance] = useState<string>('--- ISC');
   const [isuncoinPerf, setIsuncoinPerf] = useState<string>('medium');
   const processingRef = useRef<Set<string>>(new Set());
@@ -12,12 +13,11 @@ const ServiceStatus: React.FC = () => {
   // Config State
   const [selectedService, setSelectedService] = useState<string | null>(null);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [config, setConfig] = useState<any>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-
     const fetchAndManage = async () => {
       if (typeof window === 'undefined' || !window.electronAPI) return;
       try {
@@ -28,14 +28,15 @@ const ServiceStatus: React.FC = () => {
 
         // Fetch extra info
         if (defined.includes('iSunCoin')) {
-          const ver = await window.electronAPI.getIsuncoinVersion();
-          setVersion(ver);
+          await window.electronAPI.getIsuncoinVersion();
+          // setVersion(ver); // Info: (20251214 - AI) version state usage removed as it was unused locally
 
           // Get Performance
           const conf = await window.electronAPI.getServiceConfig('iSunCoin');
-          setIsuncoinPerf(conf.performance || 'medium');
+          setIsuncoinPerf((conf.performance as string) || 'medium');
 
           // Check balance only if running
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const container = currentContainers.find((c: any) => c.names === 'iSunCoin' || c.names.includes('iSunCoin'));
           if (container && container.status.startsWith('Up')) {
             const bal = await window.electronAPI.getServiceBalance();
@@ -50,6 +51,7 @@ const ServiceStatus: React.FC = () => {
           if (serviceName === 'TideBit-DeFi') continue; // EXCLUDE TideBit-DeFi
           if (processingRef.current.has(serviceName)) continue;
 
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const container = currentContainers.find((c: any) => c.names === serviceName || c.names.includes(serviceName));
           let status = 'NOT DEPLOYED';
           let id: string | null = null;
@@ -86,7 +88,7 @@ const ServiceStatus: React.FC = () => {
     };
 
     fetchAndManage();
-    interval = setInterval(fetchAndManage, 10000);
+    const interval = setInterval(fetchAndManage, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -173,8 +175,9 @@ const ServiceStatus: React.FC = () => {
               {selectedService === 'iSunCoin' ? (
                 <>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Wallet Address</label>
+                    <label htmlFor="wallet-address" style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Wallet Address</label>
                     <input
+                      id="wallet-address"
                       type="text"
                       value={config.address || ''}
                       onChange={(e) => setConfig({ ...config, address: e.target.value })}
@@ -187,10 +190,11 @@ const ServiceStatus: React.FC = () => {
                         outline: 'none'
                       }}
                       placeholder="Enter wallet address"
+                      aria-label="Wallet Address"
                     />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <label style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Performance Level</label>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Performance Level</span>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       {['low', 'medium', 'high'].map((level) => (
                         <button
@@ -361,10 +365,12 @@ const ServiceStatus: React.FC = () => {
                       <span style={{ color: 'var(--text-secondary)' }}>Performance:</span>
                       <span style={{ fontFamily: 'monospace', color: '#B2EBF2', textTransform: 'capitalize' }}>{isuncoinPerf}</span>
                     </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>Balance:</span>
-                      <span style={{ fontFamily: 'monospace', color: '#00E5FF' }}>{balance}</span>
-                    </div>
+                    {balance && (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Balance:</span>
+                        <span style={{ fontFamily: 'monospace', color: '#00E5FF' }}>{balance}</span>
+                      </div>
+                    )}
                   </>
                 )}
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>

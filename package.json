@@ -6,8 +6,9 @@
   "scripts": {
     "start": "npm run build && electron . --trace-warnings",
     "dev": "next dev",
-    "lint": "next lint && eslint --fix --ext .js,.jsx,.ts,.tsx .",
-    "build": "npm run build:main && npm run build:renderer",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "build": "npm run lint &&npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "next build",
     "build:win": "npm run build && electron-builder --win",
@@ -59,6 +60,7 @@
   "license": "ISC",
   "devDependencies": {
     "@emnapi/runtime": "^1.7.1",
+    "@next/eslint-plugin-next": "^16.0.10",
     "@types/electron": "^1.4.38",
     "@types/node": "^25.0.1",
     "@types/react": "^19.2.7",
@@ -69,13 +71,21 @@
     "chart.js": "^4.5.1",
     "electron": "^39.2.7",
     "electron-builder": "^26.0.12",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-tailwindcss": "^3.18.2",
+    "globals": "^16.5.0",
     "lucide-react": "^0.561.0",
     "next": "^16.0.10",
     "postcss": "^8.4.31",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.49.0"
   },
   "dependencies": {
     "systeminformation": "^5.27.13"

@@ -3,18 +3,12 @@
 import React, { useEffect, useState } from 'react';
 import { Play, Square, Trash2 } from 'lucide-react';
 
-interface Container {
-  id: string;
-  image: string;
-  names: string;
-  status: string;
-  ports: string;
-}
+import { IDockerContainer } from '@/types';
 
 const MyServices: React.FC = () => {
   const [services, setServices] = useState<{
     name: string;
-    container?: Container;
+    container?: IDockerContainer;
     isRunning: boolean;
     isDefined: boolean;
   }[]>([]);
@@ -27,7 +21,12 @@ const MyServices: React.FC = () => {
       const definedNames = await window.electronAPI.getDefinedServices();
       const containers = await window.electronAPI.getDockerContainers();
 
-      const list: any[] = [];
+      const list: {
+        name: string;
+        container?: IDockerContainer;
+        isRunning: boolean;
+        isDefined: boolean;
+      }[] = [];
 
       // 1. Defined Services
       definedNames.forEach(name => {
@@ -45,7 +44,11 @@ const MyServices: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchServices();
+    // Info: (20251214 - AI) Wrap async call to avoid direct setState warning (though async functions already defer)
+    const init = async () => {
+      await fetchServices();
+    };
+    init();
     const interval = setInterval(fetchServices, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -57,7 +60,7 @@ const MyServices: React.FC = () => {
       if (action === 'start') await window.electronAPI.dockerStart(target);
       if (action === 'deploy') await window.electronAPI.dockerDeploy(target);
       await fetchServices();
-    } catch (e) { alert('Action failed'); }
+    } catch { alert('Action failed'); }
     setLoading(false);
   };
 

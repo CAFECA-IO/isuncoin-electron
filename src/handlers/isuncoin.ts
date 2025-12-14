@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import { spawn } from 'child_process';
 
 const SERVICE_NAME = 'iSunCoin';
-const DOCKER_IMAGE_NAME = 'isuncoin'; // Lowercase for docker tag
+
 const CONTAINER_NAME = 'iSunCoin'; // Name of container matches service name usually
 
 export const registerIsuncoinHandlers = (ipc: typeof ipcMain, servicesPath: string) => {
@@ -19,18 +19,18 @@ export const registerIsuncoinHandlers = (ipc: typeof ipcMain, servicesPath: stri
         const content = await fs.promises.readFile(configPath, 'utf-8');
         const config = JSON.parse(content);
         address = config.address;
-      } catch (e) {
-        return '0.00 ISC'; // No config or invalid
+      } catch {
+        return '--- ISC'; // No config or invalid
       }
 
       if (!address || !address.startsWith('0x')) {
-        return '0.00 ISC';
+        return '--- ISC';
       }
 
       // 2. Query Docker using iSunCoin attach
       return new Promise((resolve) => {
-        // Info: (20251214 - AI) Check block height > 3M before showing balance
-        const cmd = `if (eth.blockNumber > 3000000) { web3.fromWei(eth.getBalance('${address}'), 'ether') } else { "Syncing" }`;
+        // Info: (20251214 - AI) Custom logic: >3M blocks show balance, else show sync %
+        const cmd = `var bn=eth.blockNumber;if(bn>3000000){web3.fromWei(eth.getBalance('${address}'),'ether')+' ISC'}else{var s=eth.syncing;var c=bn;var t=s?s.highestBlock:3000000;if(s)c=s.currentBlock;var p=Math.floor((c/t)*100);'Syncing: '+p+'%'}`;
         const process = spawn('docker', ['exec', CONTAINER_NAME, 'isuncoin', 'attach', '--exec', cmd]);
         let output = '';
 
@@ -38,30 +38,31 @@ export const registerIsuncoinHandlers = (ipc: typeof ipcMain, servicesPath: stri
 
         process.on('close', (code) => {
           if (code !== 0) {
-            resolve('0.00 ISC'); // Failed or service stopped
+            resolve('--- ISC'); // Failed or service stopped
             return;
           }
           try {
             // Output parsing
             let res = output.trim();
+            console.log('Balance output:', res);
             // Remove quotes if present
             if (res.startsWith('"') && res.endsWith('"')) {
               res = res.slice(1, -1);
             }
 
-            if (res === 'Syncing') {
-              resolve('Syncing...');
+            if (res.startsWith('Syncing:')) {
+              resolve(res);
               return;
             }
 
             if (res.includes('Error')) {
-              resolve('0.00 ISC');
+              resolve('--- ISC');
               return;
             }
 
             // Simple validation/formatting
             if (isNaN(parseFloat(res))) {
-              resolve('0.00 ISC');
+              resolve('--- ISC');
               return;
             }
 
@@ -69,33 +70,42 @@ export const registerIsuncoinHandlers = (ipc: typeof ipcMain, servicesPath: stri
             const num = parseFloat(res);
             resolve(`${num.toFixed(2)} ISC`);
 
-          } catch (e) {
-            resolve('0.00 ISC');
+          } catch {
+            resolve('--- ISC');
           }
         });
       });
 
     } catch (e) {
       console.error('Balance check error:', e);
-      return '0.00 ISC';
+      return '--- ISC';
     }
   });
 
   ipc.handle('get-isuncoin-version', async () => {
     try {
-      // Info: Exec into docker container 'iSunCoin'
+      // Info: (20251214 - AI) Use local binary version check instead of docker
+      const binPath = path.resolve('extra/isuncoin');
+
       return new Promise((resolve) => {
-        const process = spawn('docker', ['exec', CONTAINER_NAME, 'isuncoin', 'version']);
+        // Ensure binary is executable (best effort on mac/linux)
+        if (process.platform !== 'win32') {
+          try {
+            fs.chmodSync(binPath, '755');
+          } catch { }
+        }
+
+        const proc = spawn(binPath, ['version']);
         let output = '';
         let error = '';
 
-        process.stdout.on('data', (data) => output += data.toString());
-        process.stderr.on('data', (data) => error += data.toString());
+        proc.stdout.on('data', (data) => output += data.toString());
+        proc.stderr.on('data', (data) => error += data.toString());
 
-        process.on('close', (code) => {
+        proc.on('close', (code) => {
           if (code !== 0) {
-            console.error('Failed to get version from docker:', error);
-            resolve('Unknown (Service Stopped)');
+            console.error('Failed to get version from local binary:', error);
+            resolve('Unknown (Binary Error)');
             return;
           }
           // Info: Extract "Version: 1.12.3-stable" -> "v1.12.3-stable"
@@ -111,9 +121,9 @@ export const registerIsuncoinHandlers = (ipc: typeof ipcMain, servicesPath: stri
           resolve(stdout || 'Unknown');
         });
 
-        process.on('error', (err) => {
-          console.error('Docker exec error:', err);
-          resolve('Unknown (Error)');
+        proc.on('error', (err) => {
+          console.error('Local binary exec error:', err);
+          resolve('Unknown (Exec Error)');
         });
       });
     } catch (e) {
@@ -147,7 +157,7 @@ export const getIsuncoinRunArgs = async (servicesPath: string): Promise<string[]
 
     console.log(`[iSunCoin Handler] Run args: ${args.join(' ')}`);
     return args;
-  } catch (e) {
+  } catch {
     console.warn('Failed to read config for run args, using default CMD');
     return [];
   }

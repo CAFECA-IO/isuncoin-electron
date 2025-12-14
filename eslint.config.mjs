@@ -42,6 +42,7 @@ const tslintConfigs = [
       'node_modules',
       '.next',
       'dist',
+      'dist_*',
       'build',
       'eslint.config.mjs',
       'tailwind.config.ts',

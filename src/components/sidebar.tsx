@@ -4,9 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { LayoutDashboard, ShoppingBag, Server, Activity, Settings } from 'lucide-react';
 
-interface SidebarProps {
-  activeView?: string;
-}
+
 
 // Info: (20251214 - AI) Server Component is fine here, or Client if we need usage of hooks
 // Info: (20251214 - AI) For active state highlighting, we likely need usePathname in a Client Component wrapper,
@@ -37,6 +35,12 @@ const Sidebar: React.FC = () => {
     { id: 'monitor', label: 'Node Monitor', path: '/monitor', icon: <Activity size={20} />, disabled: true },
     { id: 'settings', label: 'Settings', path: '/settings', icon: <Settings size={20} />, disabled: true }
   ];
+
+  const handleQuit = async () => {
+    if (typeof window !== 'undefined' && window.electronAPI) {
+      await window.electronAPI.quitApp();
+    }
+  };
 
   return (
     <aside className="sidebar">
@@ -84,8 +88,29 @@ const Sidebar: React.FC = () => {
         </ul>
       </nav>
 
-      <div className="sidebar-footer" style={{ marginTop: 'auto' }}>
-        <div style={{ marginTop: '10px', fontSize: '12px', opacity: 0.5, textAlign: 'center' }}>
+      <div className="sidebar-footer" style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <button
+          onClick={handleQuit}
+          style={{
+            background: 'rgba(255, 0, 0, 0.1)',
+            border: '1px solid rgba(255, 0, 0, 0.2)',
+            color: '#ff4d4d',
+            padding: '10px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 0, 0, 0.2)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 0, 0, 0.1)'}
+        >
+          Close iSunCloud
+        </button>
+        <div style={{ fontSize: '12px', opacity: 0.5, textAlign: 'center' }}>
           {version}
         </div>
       </div>

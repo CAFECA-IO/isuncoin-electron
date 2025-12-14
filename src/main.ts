@@ -1,7 +1,7 @@
-import { app, BrowserWindow, ipcMain, protocol, net, Tray, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, net, Tray, nativeImage } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import * as si from 'systeminformation';
 import { registerIsuncoinHandlers, getIsuncoinRunArgs, configureIsuncoinPostStart } from './handlers/isuncoin';
 
@@ -64,9 +64,14 @@ app.whenReady().then(() => {
     });
   });
 
+  ipcMain.handle('quit-app', () => {
+    app.quit();
+  });
+
   // Info: (20251214 - AI) Stats History Buffer
   // 24 hours * 60 minutes = 1440 points
   const MAX_HISTORY_POINTS = 1440;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const statsHistory: any[] = [];
 
   const collectStats = async () => {
@@ -231,7 +236,7 @@ app.whenReady().then(() => {
       return { success: false, error: 'No Dockerfile' };
     }
 
-    let tag = `${serviceName.toLowerCase()}:latest`;
+    const tag = `${serviceName.toLowerCase()}:latest`;
 
     console.log(`Building docker image for ${serviceName} with tag ${tag}...`);
 
@@ -343,21 +348,21 @@ app.whenReady().then(() => {
     appTray = new Tray(trayIcon);
     appTray.setToolTip('iSunCloud Gateway');
 
-    const contextMenu = Menu.buildFromTemplate([
-      {
-        label: 'Open Dashboard', click: () => {
-          const wins = BrowserWindow.getAllWindows();
-          if (wins.length === 0) {
-            createWindow();
-          } else {
-            wins[0].show();
-            wins[0].focus();
-          }
-        }
-      },
-      { type: 'separator' },
-      { label: 'Quit', role: 'quit' }
-    ]);
+    // const contextMenu = Menu.buildFromTemplate([
+    //   {
+    //     label: 'Open Dashboard', click: () => {
+    //       const wins = BrowserWindow.getAllWindows();
+    //       if (wins.length === 0) {
+    //         createWindow();
+    //       } else {
+    //         wins[0].show();
+    //         wins[0].focus();
+    //       }
+    //     }
+    //   },
+    //   { type: 'separator' },
+    //   { label: 'Quit', role: 'quit' }
+    // ]);
     // appTray.setContextMenu(contextMenu); // Optional: if we want right-click menu. User asked for "Click to launch", usually left click.
 
     appTray.on('click', () => {
@@ -395,8 +400,8 @@ const runFlopsBenchmark = async () => {
 
     if (process.platform !== 'win32') {
       try {
-        require('child_process').execSync(`chmod +x "${binaryPath}"`);
-      } catch (e) { }
+        execSync(`chmod +x "${binaryPath}"`);
+      } catch { }
     }
 
     const processProc = spawn(binaryPath, ['flops']);

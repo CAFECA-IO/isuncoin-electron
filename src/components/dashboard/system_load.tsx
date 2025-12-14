@@ -26,7 +26,7 @@ const SystemLoad: React.FC = () => {
   const [flops, setFlops] = useState<string>('---');
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+
 
     const runBench = async () => {
       if (typeof window === 'undefined' || !window.electronAPI) return;
@@ -63,11 +63,9 @@ const SystemLoad: React.FC = () => {
     };
 
     updateStats();
-    updateStats();
-    intervalId = setInterval(updateStats, 2000);
-
     // Info: (20251214 - AI) FLOPs check: Run once, then every 5 minutes
     runBench();
+    const intervalId = setInterval(updateStats, 2000);
     const benchInterval = setInterval(runBench, 5 * 60 * 1000);
 
     return () => {
