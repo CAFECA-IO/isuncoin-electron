@@ -6,6 +6,7 @@
   "scripts": {
     "start": "npm run build && electron . --trace-warnings",
     "dev": "next dev",
+    "lint": "next lint && eslint --fix --ext .js,.jsx,.ts,.tsx .",
     "build": "npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "next build",
@@ -38,14 +39,14 @@
     "mac": {
       "target": {
         "target": "dmg",
-        "hardenedRuntime": true,
-        "gatekeeperAssess": false,
-        "extendInfo": {
-          "NSFaceIDUsageDescription": "We need your Face ID to secure your system."
-        },
         "arch": [
           "arm64"
         ]
+      },
+      "hardenedRuntime": true,
+      "gatekeeperAssess": true,
+      "extendInfo": {
+        "NSFaceIDUsageDescription": "This app needs access to the Face ID"
       },
       "icon": "src/assets/icon.png"
     },
@@ -57,6 +58,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@emnapi/runtime": "^1.7.1",
     "@types/electron": "^1.4.38",
     "@types/node": "^25.0.1",
     "@types/react": "^19.2.7",
@@ -64,17 +66,16 @@
     "@types/systeminformation": "^3.23.1",
     "autoprefixer": "^10.4.16",
     "axios": "^1.13.2",
+    "chart.js": "^4.5.1",
     "electron": "^39.2.7",
     "electron-builder": "^26.0.12",
-    "postcss": "^8.4.31",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5.9.3",
-    "@emnapi/runtime": "^1.7.1",
-    "chart.js": "^4.5.1",
     "lucide-react": "^0.561.0",
     "next": "^16.0.10",
+    "postcss": "^8.4.31",
     "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react-dom": "^19.2.3",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "systeminformation": "^5.27.13"

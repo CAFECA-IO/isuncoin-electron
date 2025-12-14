@@ -3,7 +3,7 @@ FROM ubuntu:24.04
 
 # Info: (20251213 - AI) Install dependencies
 # Info: (20251213 - AI) git for cloning, golang for building, ca-certificates for HTTPS
-RUN apt-get update && apt-get install -y git golang ca-certificates
+RUN apt-get update && apt-get install -y git golang ca-certificates curl
 
 # Info: (20251213 - AI) Clone repository
 RUN git clone https://github.com/CAFECA-IO/isuncoin /opt/isuncoin

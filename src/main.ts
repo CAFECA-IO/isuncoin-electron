@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
 import * as si from 'systeminformation';
+import { registerIsuncoinHandlers, getIsuncoinRunArgs, configureIsuncoinPostStart } from './handlers/isuncoin';
 
 let appTray: Tray | null = null;
 
@@ -26,16 +27,15 @@ function createWindow() {
   // Auto-grant permissions for local device access if needed
   mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
     const url = webContents.getURL();
-    if (url.startsWith('https://isuncoin.local/')) {
+    if (url.startsWith('https://isuncloud.local/')) {
       return callback(true);
     }
     callback(false);
   });
 
   // Apply a custom certificate verification handler for our internal domain if needed
-  // (Not strictly needed for protocol.handle, but good practice if Electron checks)
   mainWindow.webContents.session.setCertificateVerifyProc((request, callback) => {
-    if (request.hostname === 'isuncoin.local') {
+    if (request.hostname === 'isuncloud.local') {
       callback(0); // Success
     } else {
       callback(-3); // Use default verification
@@ -43,13 +43,14 @@ function createWindow() {
   });
 
   // Serve via intercepted HTTPS to ensure Secure Context for WebAuthn and consistency
-  mainWindow.loadURL('https://isuncoin.local/index.html');
+  mainWindow.loadURL('https://isuncloud.local/index.html');
 }
 
 app.whenReady().then(() => {
-  ipcMain.handle('get-flops', async () => {
-    return await runFlopsBenchmark();
-  });
+  const servicesRoot = path.join(__dirname, '..', 'services');
+
+  // Register Service Handlers
+  registerIsuncoinHandlers(ipcMain, servicesRoot);
 
   ipcMain.handle('check-docker', async () => {
     return new Promise((resolve) => {
@@ -73,17 +74,15 @@ app.whenReady().then(() => {
       const cpuLoad = await si.currentLoad();
       const mem = await si.mem();
       const network = await si.networkStats();
-      const fs = await si.fsSize();
+      const fsData = await si.fsSize();
       // Info: (20251214 - AI) GPU Load is experimental/platform dependent in systeminformation
-      // const graphics = await si.graphics();
-      // const gpuLoad = graphics.controllers.length > 0 ? (graphics.controllers[0].utilizationGpu || 0) : 0;
       // Using placeholder for GPU for now as it's unreliable without specific tools suitable for Electron/Mac
       const gpuLoad = 0;
 
       // Simple aggregation or picking primary interface/disk
       const netRx = network.length > 0 ? network[0].rx_sec : 0;
       const netTx = network.length > 0 ? network[0].tx_sec : 0;
-      const diskUsed = fs.length > 0 ? fs[0].use : 0;
+      const diskUsed = fsData.length > 0 ? fsData[0].use : 0;
 
       const stats = {
         cpu: cpuLoad.currentLoad,
@@ -106,11 +105,7 @@ app.whenReady().then(() => {
     }
   };
 
-  // Start collection loop (every 60s for history, but frontend might poll faster for realtime)
-  // For simplicity, we'll collect every 60s for history. 
-  // Realtime requests from frontend will get fresh data + we save it if enough time passed?
-  // Let's separate history collection from realtime check or just rely on the buffer for history 
-  // and realtime calls for instant.
+  // Start collection loop (every 60s for history)
   setInterval(collectStats, 60 * 1000);
   collectStats(); // Initial collect
 
@@ -154,11 +149,28 @@ app.whenReady().then(() => {
 
   ipcMain.handle('get-defined-services', async () => {
     // Info: (20251213 - AI) Scan services/ directory for available service definitions
-    const servicesPath = path.join(__dirname, '..', 'services');
     try {
-      const files: string[] = await fs.promises.readdir(servicesPath);
-      // Info: (20251213 - AI) Return file names as service names (ignoring hidden files)
-      return files.filter((f: string) => !f.startsWith('.'));
+      const files: string[] = await fs.promises.readdir(servicesRoot);
+      const serviceNames = files.filter((f: string) => !f.startsWith('.'));
+
+      // Info: (20251214 - AI) Sort services: with Dockerfile first, then without (e.g. placeholders)
+      const servicesWithStatus = await Promise.all(serviceNames.map(async (name) => {
+        const dockerfilePath = path.join(servicesRoot, name, 'Dockerfile');
+        let hasDockerfile = false;
+        try {
+          await fs.promises.access(dockerfilePath);
+          hasDockerfile = true;
+        } catch { }
+        return { name, hasDockerfile };
+      }));
+
+      servicesWithStatus.sort((a, b) => {
+        if (a.hasDockerfile && !b.hasDockerfile) return -1;
+        if (!a.hasDockerfile && b.hasDockerfile) return 1;
+        return a.name.localeCompare(b.name); // Alphabetical tie-break
+      });
+
+      return servicesWithStatus.map(s => s.name);
     } catch (error) {
       console.error('Error reading services directory:', error);
       return [];
@@ -181,83 +193,129 @@ app.whenReady().then(() => {
     });
   });
 
+  // Old get-isuncoin-balance and get-isuncoin-version handlers removed (logic moved to handler)
 
-
-  ipcMain.handle('get-isuncoin-version', async () => {
+  ipcMain.handle('get-service-config', async (_event, serviceName) => {
     try {
-      // Info: (20251214 - AI) Resolve binary path.
-      // In Dev: dist/../extra/isuncoin -> root/extra/isuncoin
-      // In Prod: resources/extra/isuncoin
-      let binaryPath = path.join(__dirname, '../extra/isuncoin');
-      if (process.env.NODE_ENV === 'production' || app.isPackaged) {
-        binaryPath = path.join(process.resourcesPath, 'extra/isuncoin');
+      const configPath = path.join(servicesRoot, serviceName, 'config.json');
+      // check if exists
+      try {
+        await fs.promises.access(configPath);
+      } catch {
+        return {}; // Return empty if not exists
       }
 
-      // Info: (20251214 - AI) Exec command
-      // On Mac/Linux make sure it's executable
-      if (process.platform !== 'win32') {
-        try {
-          require('child_process').execSync(`chmod +x "${binaryPath}"`);
-        } catch (e) { /* ignore if already executable or permission denied */ }
+      const content = await fs.promises.readFile(configPath, 'utf-8');
+      try {
+        return JSON.parse(content);
+      } catch (e) {
+        console.error(`Failed to parse config for ${serviceName}:`, e);
+        return {};
       }
-
-      const { exec } = require('child_process');
-      return new Promise((resolve) => {
-        exec(`"${binaryPath}" version`, (error: any, stdout: string) => {
-          if (error) {
-            console.error('Failed to get version:', error);
-            resolve('Unknown');
-            return;
-          }
-          // Info: (20251214 - AI) Extract "Version: 1.12.3-stable" -> "v1.12.3-stable"
-          const versionLine = stdout.split('\n').find(line => line.startsWith('Version:'));
-          if (versionLine) {
-            const version = versionLine.split(':')[1]?.trim();
-            if (version) {
-              resolve(`v${version}`);
-              return;
-            }
-          }
-          resolve(stdout.trim());
-        });
-      });
     } catch (e) {
-      console.error('Version check error:', e);
-      return 'Error';
+      console.error(`Failed to read config for ${serviceName}:`, e);
+      return {};
     }
   });
 
-  ipcMain.handle('docker-deploy', async (_event, serviceName) => {
-    // Info: (20251213 - AI) 1. Build Image
-    // Info: (20251213 - AI) docker build -f services/<name> -t <name> .
+  // Helper: Deploy Service
+  const deployService = async (serviceName: string) => {
+    const servicePath = path.join(servicesRoot, serviceName);
+
+    // Check if Dockerfile exists
+    const dockerfilePath = path.join(servicePath, 'Dockerfile');
+    try {
+      await fs.promises.access(dockerfilePath);
+    } catch {
+      // Info: (20251214 - Luphia) Skip deployment if no Dockerfile
+      return { success: false, error: 'No Dockerfile' };
+    }
+
+    let tag = `${serviceName.toLowerCase()}:latest`;
+
+    console.log(`Building docker image for ${serviceName} with tag ${tag}...`);
+
     const buildSuccess = await new Promise<boolean>((resolve) => {
-      const dockerfile = path.join(__dirname, '..', 'services', serviceName);
-      // Info: (20251213 - AI) Context is root (..)
-      const buildCtx = path.join(__dirname, '..');
-      const process = spawn('docker', ['build', '-f', dockerfile, '-t', serviceName, buildCtx]);
+      // Command: docker build -t <tag> <path>
+      const process = spawn('docker', ['build', '-t', tag, servicePath]);
+
+      process.stdout.on('data', (data) => console.log(`[Docker Build] ${data}`));
+      process.stderr.on('data', (data) => console.error(`[Docker Build Error] ${data}`));
+
       process.on('close', (code) => resolve(code === 0));
-      process.on('error', () => resolve(false));
+      process.on('error', (err) => {
+        console.error('Docker build spawn error:', err);
+        resolve(false);
+      });
     });
 
     if (!buildSuccess) return { success: false, error: 'Build failed' };
 
-    // Info: (20251213 - AI) 2. Run Container
-    // Info: (20251213 - AI) docker run -d --name <name> <name>
-    return new Promise((resolve) => {
-      // Info: (20251213 - AI) Remove existing container with same name if exists (optional but good for dev)
-      spawn('docker', ['rm', '-f', serviceName]).on('close', () => {
-        const runProcess = spawn('docker', ['run', '-d', '--name', serviceName, serviceName]);
-        runProcess.on('close', (code) => resolve({ success: code === 0 }));
-        runProcess.on('error', (err) => resolve({ success: false, error: err.message }));
+    return new Promise<{ success: boolean, error?: string }>(async (resolve) => {
+      // Remove existing container
+      await new Promise<void>(res => {
+        const rm = spawn('docker', ['rm', '-f', serviceName]);
+        rm.on('close', () => res());
       });
+
+      // Prepare Run Args
+      const runArgs = ['run', '-d', '--name', serviceName, tag];
+
+      // Info: (20251214 - AI) Apply Config via Handler for iSunCoin
+      if (serviceName === 'iSunCoin') {
+        const handlerArgs = await getIsuncoinRunArgs(servicesRoot);
+        runArgs.push(...handlerArgs);
+      }
+
+      // Run new container
+      const runProcess = spawn('docker', runArgs);
+      runProcess.stdout.on('data', (d) => console.log(`[Docker Run] ${d}`));
+      runProcess.stderr.on('data', (d) => console.error(`[Docker Run Err] ${d}`));
+
+      runProcess.on('close', async (code) => {
+        if (code === 0) {
+          // Success
+          // Info: (20251214 - AI) Post-start configuration via Handler for iSunCoin
+          if (serviceName === 'iSunCoin') {
+            await configureIsuncoinPostStart(servicesRoot);
+          }
+          resolve({ success: true });
+        } else {
+          resolve({ success: false, error: 'Docker run failed' });
+        }
+      });
+      runProcess.on('error', (err) => resolve({ success: false, error: err.message }));
     });
+  };
+
+  ipcMain.handle('save-service-config', async (_event, serviceName, config) => {
+    try {
+      const configPath = path.join(servicesRoot, serviceName, 'config.json');
+      await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
+
+      // Info: (20251214 - AI) Trigger redeploy to apply new args
+      console.log(`Config saved for ${serviceName}, triggering redeploy...`);
+      const result = await deployService(serviceName);
+
+      if (!result.success) {
+        return { success: true, warning: 'Config saved but redeploy failed: ' + result.error };
+      }
+      return { success: true };
+    } catch (e) {
+      console.error(`Failed to save config for ${serviceName}:`, e);
+      return { success: false, error: (e as Error).message };
+    }
+  });
+
+  ipcMain.handle('docker-deploy', async (_event, serviceName) => {
+    return await deployService(serviceName);
   });
 
   // Handle Custom Protocol (HTTPS Interception)
   protocol.handle('https', (req) => {
     const url = req.url;
-    if (url.startsWith('https://isuncoin.local/')) {
-      const pathName = url.replace('https://isuncoin.local/', '').split('?')[0];
+    if (url.startsWith('https://isuncloud.local/')) {
+      const pathName = url.replace('https://isuncloud.local/', '').split('?')[0];
       const filename = pathName === '' || pathName === '/' ? 'index.html' : pathName;
       // Basic protection against directory traversal (though unlikely with this logic)
       if (filename.includes('..')) return new Response('Not Found', { status: 404 });
@@ -312,24 +370,22 @@ app.whenReady().then(() => {
       }
     });
 
-    // Polling for Tooltip
-    const updateTooltip = async () => {
-      const result = await runFlopsBenchmark();
-      if (result.success && result.data) {
-        const match = result.data.match(/Total Compute Power:\s*([\d.]+)\s*TFLOPS/);
-        const flops = match ? `${match[1]} TFLOPS` : 'Unknown';
-        appTray?.setToolTip(`Computing Power: ${flops}`);
-      }
-    };
-
-    updateTooltip();
-    setInterval(updateTooltip, 60000); // Update every minute
+    // Initial Update
+    updateFlopsCache();
+    // Poll every 5 minutes
+    setInterval(updateFlopsCache, 5 * 60 * 1000);
   };
 
   initTray();
 });
 
 // Helper for FLOPs
+// --------------------------------------------------------------------------
+// Centralized FLOPs Manager
+// --------------------------------------------------------------------------
+let flopsCache: { success: boolean, data?: string, error?: string } | null = null;
+let flopsUpdatePromise: Promise<void> | null = null;
+
 const runFlopsBenchmark = async () => {
   return new Promise<{ success: boolean, data?: string, error?: string }>((resolve) => {
     let binaryPath = path.join(__dirname, '../extra/isuncoin');
@@ -360,6 +416,69 @@ const runFlopsBenchmark = async () => {
     processProc.on('error', (err) => resolve({ success: false, error: err.message }));
   });
 };
+
+const updateFlopsCache = async () => {
+  // If already updating, join that promise
+  if (flopsUpdatePromise) return flopsUpdatePromise;
+
+  flopsUpdatePromise = (async () => {
+    try {
+      const result = await runFlopsBenchmark();
+      flopsCache = result;
+
+      // Update Tray Tooltip immediately
+      if (appTray && result.success && result.data) {
+        const match = result.data.match(/Total Compute Power:\s*([\d.]+)\s*TFLOPS/);
+        const flops = match ? `${match[1]} TFLOPS` : 'Unknown';
+        appTray.setToolTip(`Computing Power: ${flops}`);
+      }
+    } finally {
+      flopsUpdatePromise = null;
+    }
+  })();
+  return flopsUpdatePromise;
+};
+
+// Updated: get-flops returns cached value or triggers update if empty
+ipcMain.handle('get-flops', async () => {
+  if (flopsCache) return flopsCache;
+  await updateFlopsCache();
+  return flopsCache;
+});
+
+
+app.on('before-quit', async (event) => {
+  event.preventDefault(); // Prevent default quit to allow async cleanup
+
+  console.log('Cleaning up services before quit...');
+  const servicesPath = path.join(__dirname, '..', 'services');
+
+  try {
+    const files = await fs.promises.readdir(servicesPath);
+    const services = files.filter((f: string) => !f.startsWith('.'));
+
+    // Stop all services concurrently
+    await Promise.all(services.map(async (serviceName: string) => {
+      return new Promise<void>((resolve) => {
+        console.log(`Stopping service: ${serviceName}...`);
+        // Use shorter timeout for faster shutdown
+        const process = spawn('docker', ['stop', '-t', '2', serviceName]);
+        process.on('close', (code) => {
+          console.log(`Service ${serviceName} stopped with code ${code}`);
+          resolve();
+        });
+        process.on('error', (err) => {
+          console.error(`Failed to stop ${serviceName}:`, err);
+          resolve();
+        });
+      });
+    }));
+  } catch (error) {
+    console.error('Error during cleanup:', error);
+  }
+
+  app.exit(0); // Proceed with quit
+});
 
 app.on('window-all-closed', function () {
   // Do not quit on Mac when windows close, keep tray active

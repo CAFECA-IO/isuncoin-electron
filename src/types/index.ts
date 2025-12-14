@@ -27,6 +27,9 @@ export interface ElectronAPI {
   dockerStop: (id: string) => Promise<boolean>;
   dockerDeploy: (name: string) => Promise<{ success: boolean; error?: string }>;
   getIsuncoinVersion: () => Promise<string>;
+  getServiceConfig: (serviceName: string) => Promise<any>;
+  saveServiceConfig: (serviceName: string, config: any) => Promise<{ success: boolean; error?: string }>;
+  getServiceBalance: () => Promise<string>;
 }
 
 declare global {

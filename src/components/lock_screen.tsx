@@ -59,6 +59,13 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
       const challenge = new Uint8Array(32);
       crypto.getRandomValues(challenge);
 
+      // ToDo: (20251214 - Luphia) remove simulation
+      setTimeout(() => {
+        setStatus('Registration Successful');
+        localStorage.setItem('fido_cred_id', 'simulated');
+        onUnlock();
+      }, 500);
+
       const credential = await navigator.credentials.create({
         publicKey: {
           challenge: challenge,
@@ -98,6 +105,13 @@ const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
   const handleAuthenticate = async () => {
     setStatus('Waiting for key...');
     setError('');
+
+    // ToDo: (20251214 - Luphia) remove simulation
+    setTimeout(() => {
+      setIsRegistered(true);
+      setStatus('Unlocked');
+      onUnlock();
+    }, 500);
 
     try {
       const savedId = localStorage.getItem('fido_cred_id');

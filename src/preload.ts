@@ -10,5 +10,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dockerStop: (id: string) => ipcRenderer.invoke('docker-stop', id),
   dockerDeploy: (name: string) => ipcRenderer.invoke('docker-deploy', name),
   getIsuncoinVersion: () => ipcRenderer.invoke('get-isuncoin-version'),
-  getStatsHistory: () => ipcRenderer.invoke('get-stats-history')
+  getStatsHistory: () => ipcRenderer.invoke('get-stats-history'),
+  getServiceConfig: (serviceName: string) => ipcRenderer.invoke('get-service-config', serviceName),
+  saveServiceConfig: (serviceName: string, config: any) => ipcRenderer.invoke('save-service-config', serviceName, config),
+  getServiceBalance: () => ipcRenderer.invoke('get-isuncoin-balance')
 });
