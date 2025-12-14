@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, protocol, net, Tray, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, net, Tray, nativeImage, Menu } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { spawn, execSync } from 'child_process';
@@ -270,6 +270,12 @@ app.whenReady().then(() => {
       if (serviceName === 'iSunCoin') {
         const handlerArgs = await getIsuncoinRunArgs(servicesRoot);
         runArgs.push(...handlerArgs);
+      } else if (serviceName === 'SwarmStorage') {
+        // Map required ports for SwarmStorage (API, IPFS Swarm, IPFS API, IPFS Gateway)
+        runArgs.push('-p', '10014:10014'); // SwarmStorage API
+        runArgs.push('-p', '4001:4001');   // IPFS Swarm
+        runArgs.push('-p', '5001:5001');   // IPFS API
+        runArgs.push('-p', '8080:8080');   // IPFS Gateway
       }
 
       // Run new container
@@ -348,22 +354,22 @@ app.whenReady().then(() => {
     appTray = new Tray(trayIcon);
     appTray.setToolTip('iSunCloud Gateway');
 
-    // const contextMenu = Menu.buildFromTemplate([
-    //   {
-    //     label: 'Open Dashboard', click: () => {
-    //       const wins = BrowserWindow.getAllWindows();
-    //       if (wins.length === 0) {
-    //         createWindow();
-    //       } else {
-    //         wins[0].show();
-    //         wins[0].focus();
-    //       }
-    //     }
-    //   },
-    //   { type: 'separator' },
-    //   { label: 'Quit', role: 'quit' }
-    // ]);
-    // appTray.setContextMenu(contextMenu); // Optional: if we want right-click menu. User asked for "Click to launch", usually left click.
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Open Dashboard', click: () => {
+          const wins = BrowserWindow.getAllWindows();
+          if (wins.length === 0) {
+            createWindow();
+          } else {
+            wins[0].show();
+            wins[0].focus();
+          }
+        }
+      },
+      { type: 'separator' },
+      { label: 'Quit', role: 'quit' }
+    ]);
+    appTray.setContextMenu(contextMenu); // Optional: if we want right-click menu. User asked for "Click to launch", usually left click.
 
     appTray.on('click', () => {
       const wins = BrowserWindow.getAllWindows();

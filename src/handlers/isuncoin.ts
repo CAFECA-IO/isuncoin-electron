@@ -44,7 +44,7 @@ export const registerIsuncoinHandlers = (ipc: typeof ipcMain, servicesPath: stri
           try {
             // Output parsing
             let res = output.trim();
-            console.log('Balance output:', res);
+
             // Remove quotes if present
             if (res.startsWith('"') && res.endsWith('"')) {
               res = res.slice(1, -1);
