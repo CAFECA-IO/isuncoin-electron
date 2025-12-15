@@ -121,7 +121,7 @@ const tslintConfigs = [
         ecmaVersion: 'latest',
         sourceType: 'module',
         ecmaFeatures: { jsx: false }, // Info: (20251113 - Tzuhan) Node 腳本不需要 JSX
-        project: ['./tsconfig.hardhat.json'], // Info: (20251113 - Tzuhan) <-- 使用 Hardhat 專用 tsconfig
+        project: ['./tsconfig.scripts.json'], // Info: (20251113 - Tzuhan) <-- 使用 Hardhat 專用 tsconfig
       },
       globals: {
         ...globals.node, // Info: (20251113 - Tzuhan) 主要是 Node 環境

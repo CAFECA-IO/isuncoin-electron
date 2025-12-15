@@ -12,7 +12,7 @@ const DockerCheckWrapper: React.FC<{ children: React.ReactNode }> = ({ children 
     if (typeof window !== 'undefined' && window.electronAPI) {
       try {
         const result = await window.electronAPI.checkDocker();
-        setHasDocker(result || true);
+        setHasDocker(result);
       } catch (error) {
         console.error("Failed to check docker:", error);
         setHasDocker(false);

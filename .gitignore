@@ -21,6 +21,9 @@
 
 # extra files
 /extra
+/extra_mac
+/extra_windows
+/extra_linux
 
 # misc
 .DS_Store

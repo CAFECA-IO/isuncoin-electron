@@ -8,7 +8,7 @@ const SERVICE_NAME = 'iSunCoin';
 
 const CONTAINER_NAME = 'iSunCoin'; // Name of container matches service name usually
 
-export const registerIsuncoinHandlers = (ipc: typeof ipcMain, servicesPath: string) => {
+export const registerIsuncoinHandlers = (ipc: typeof ipcMain, servicesPath: string, dockerBin: string) => {
 
   ipc.handle('get-isuncoin-balance', async () => {
     try {
@@ -31,7 +31,7 @@ export const registerIsuncoinHandlers = (ipc: typeof ipcMain, servicesPath: stri
       return new Promise((resolve) => {
         // Info: (20251214 - AI) Custom logic: >3M blocks show balance, else show sync %
         const cmd = `var bn=eth.blockNumber;if(bn>3000000){web3.fromWei(eth.getBalance('${address}'),'ether')+' ISC'}else{var s=eth.syncing;var c=bn;var t=s?s.highestBlock:3000000;if(s)c=s.currentBlock;var p=Math.floor((c/t)*100);'Syncing: '+p+'%'}`;
-        const process = spawn('docker', ['exec', CONTAINER_NAME, 'isuncoin', 'attach', '--exec', cmd]);
+        const process = spawn(dockerBin, ['exec', CONTAINER_NAME, 'isuncoin', 'attach', '--exec', cmd]);
         let output = '';
 
         process.stdout.on('data', (data) => output += data.toString());
@@ -85,7 +85,7 @@ export const registerIsuncoinHandlers = (ipc: typeof ipcMain, servicesPath: stri
   ipc.handle('get-isuncoin-version', async () => {
     try {
       // Info: (20251214 - AI) Use local binary version check instead of docker
-      let binPath = path.join(__dirname, '../extra/isuncoin');
+      let binPath = path.join(__dirname, '../../extra/isuncoin');
       if (process.env.NODE_ENV === 'production' || app.isPackaged) {
         binPath = path.join(process.resourcesPath, 'extra/isuncoin');
       }
@@ -166,7 +166,7 @@ export const getIsuncoinRunArgs = async (servicesPath: string): Promise<string[]
   }
 };
 
-export const configureIsuncoinPostStart = async (servicesPath: string) => {
+export const configureIsuncoinPostStart = async (servicesPath: string, dockerBin: string) => {
   try {
     const configPath = path.join(servicesPath, SERVICE_NAME, 'config.json');
     const content = await fs.promises.readFile(configPath, 'utf-8');
@@ -174,7 +174,7 @@ export const configureIsuncoinPostStart = async (servicesPath: string) => {
 
     if (config.address && config.address.startsWith('0x')) {
       console.log(`[iSunCoin Handler] Setting miner etherbase to ${config.address}...`);
-      spawn('docker', ['exec', CONTAINER_NAME, 'isuncoin', 'attach', '--exec', `miner.setEtherbase('${config.address}')`]);
+      spawn(dockerBin, ['exec', CONTAINER_NAME, 'isuncoin', 'attach', '--exec', `miner.setEtherbase('${config.address}')`]);
     }
   } catch (e) {
     console.error('Failed to apply post-start config:', e);

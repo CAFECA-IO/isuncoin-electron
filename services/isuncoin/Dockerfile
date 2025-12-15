@@ -11,9 +11,6 @@ RUN git clone https://github.com/CAFECA-IO/isuncoin /opt/isuncoin
 # Info: (20251213 - AI) Set working directory
 WORKDIR /opt/isuncoin
 
-# Info: (20251213 - AI) Apply patch for missing flopsCommand
-COPY flops_patch.go /opt/isuncoin/cmd/isuncoin/flops_patch.go
-
 # Info: (20251213 - AI) Build binary for Linux AMD64
 RUN GOOS=linux GOARCH=amd64 go build -o isuncoin-linux ./cmd/isuncoin
 

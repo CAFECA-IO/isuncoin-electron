@@ -1,14 +1,16 @@
 {
-  "name": "isuncoin",
+  "name": "isuncloud",
+  "productName": "iSunCloud",
   "version": "1.12.3",
-  "description": "iSunCoin AI Blockchain Desktop Application",
+  "description": "iSunCloud AI Blockchain Computing Platform",
   "main": "dist/main.js",
   "scripts": {
     "start": "npm run build && electron . --trace-warnings",
     "dev": "next dev",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "build": "npm run lint && npm run build:main && npm run build:renderer",
+    "prepare:extra": "npx tsx scripts/prepare_extra.ts",
+    "build": "npm run prepare:extra && npm run lint && npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "next build",
     "build:win": "npm run build && electron-builder --win",
@@ -25,7 +27,8 @@
       "package.json"
     ],
     "extraResources": [
-      "./extra/**"
+      "./extra/**",
+      "./services/**"
     ],
     "win": {
       "target": {

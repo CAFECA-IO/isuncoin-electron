@@ -1,9 +1,38 @@
 import { app, BrowserWindow, ipcMain, protocol, net, Tray, nativeImage, Menu } from 'electron';
 import * as path from 'path';
+import * as os from 'os';
 import * as fs from 'fs';
 import { spawn, execSync } from 'child_process';
 import * as si from 'systeminformation';
 import { registerIsuncoinHandlers, getIsuncoinRunArgs, configureIsuncoinPostStart } from './handlers/isuncoin';
+
+// Info: (20251215 - AI) Binary Resolution Helper
+const resolveExtraBinary = (name: string): string => {
+  let resourcesPath = path.join(__dirname, '../extra');
+  if (app.isPackaged) {
+    resourcesPath = path.join(process.resourcesPath, 'extra');
+  }
+  const platform = process.platform;
+  let binaryName = name;
+  if (platform === 'win32') {
+    binaryName = `${name}.exe`;
+  }
+  const fullPath = path.join(resourcesPath, binaryName);
+
+  // Ensure executable on mac/linux
+  if (platform !== 'win32') {
+    try {
+      fs.chmodSync(fullPath, '755');
+    } catch { }
+  }
+  return fullPath;
+};
+
+
+// Global reference to dockerd process
+
+
+
 
 let appTray: Tray | null = null;
 
@@ -108,14 +137,20 @@ process.on('unhandledRejection', (reason) => {
 });
 
 app.whenReady().then(() => {
-  const servicesRoot = path.join(__dirname, '..', 'services');
+  let servicesRoot = path.join(__dirname, '..', 'services');
+  if (app.isPackaged) {
+    servicesRoot = path.join(process.resourcesPath, 'services');
+  }
+
+
+
 
   // Register Service Handlers
-  registerIsuncoinHandlers(ipcMain, servicesRoot);
+  registerIsuncoinHandlers(ipcMain, servicesRoot, resolveExtraBinary('docker'));
 
   ipcMain.handle('check-docker', async () => {
     return new Promise((resolve) => {
-      const process = spawn('docker', ['--version']);
+      const process = spawn(resolveExtraBinary('docker'), ['--version']);
       process.on('close', (code) => {
         resolve(code === 0);
       });
@@ -187,7 +222,7 @@ app.whenReady().then(() => {
   ipcMain.handle('get-docker-containers', async () => {
     return new Promise((resolve) => {
       // Info: (20251213 - AI) Output format: ID::Image::Names::Status::Ports
-      const process = spawn('docker', ['ps', '-a', '--format', '{{.ID}}::{{.Image}}::{{.Names}}::{{.Status}}::{{.Ports}}']);
+      const process = spawn(resolveExtraBinary('docker'), ['ps', '-a', '--format', '{{.ID}}::{{.Image}}::{{.Names}}::{{.Status}}::{{.Ports}}']);
       let data = '';
 
       process.stdout.on('data', (chunk) => {
@@ -245,7 +280,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('docker-start', async (_event, id) => {
     return new Promise((resolve) => {
-      const process = spawn('docker', ['start', id]);
+      const process = spawn(resolveExtraBinary('docker'), ['start', id]);
       process.on('close', (code) => resolve(code === 0));
       process.on('error', () => resolve(false));
     });
@@ -253,13 +288,11 @@ app.whenReady().then(() => {
 
   ipcMain.handle('docker-stop', async (_event, id) => {
     return new Promise((resolve) => {
-      const process = spawn('docker', ['stop', id]);
+      const process = spawn(resolveExtraBinary('docker'), ['stop', id]);
       process.on('close', (code) => resolve(code === 0));
       process.on('error', () => resolve(false));
     });
   });
-
-  // Old get-isuncoin-balance and get-isuncoin-version handlers removed (logic moved to handler)
 
   ipcMain.handle('get-service-config', async (_event, serviceName) => {
     try {
@@ -303,13 +336,17 @@ app.whenReady().then(() => {
 
     const buildSuccess = await new Promise<boolean>((resolve) => {
       // Command: docker build -t <tag> <path>
-      const process = spawn('docker', ['build', '-t', tag, servicePath]);
+      // Info: (20251215 - AI) Use isolated config as requested
+      const dockerConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), 'docker-config-'));
+      const processBuild = spawn(resolveExtraBinary('docker'), ['build', '-t', tag, servicePath], {
+        env: { ...process.env, DOCKER_CONFIG: dockerConfigDir }
+      });
 
-      process.stdout.on('data', (data) => console.log(`[Docker Build] ${data}`));
-      process.stderr.on('data', (data) => console.error(`[Docker Build Error] ${data}`));
+      processBuild.stdout.on('data', (data) => console.log(`[Docker Build] ${data}`));
+      processBuild.stderr.on('data', (data) => console.error(`[Docker Build Error] ${data}`));
 
-      process.on('close', (code) => resolve(code === 0));
-      process.on('error', (err) => {
+      processBuild.on('close', (code) => resolve(code === 0));
+      processBuild.on('error', (err) => {
         console.error('Docker build spawn error:', err);
         resolve(false);
       });
@@ -320,27 +357,28 @@ app.whenReady().then(() => {
     return new Promise<{ success: boolean, error?: string }>(async (resolve) => {
       // Remove existing container
       await new Promise<void>(res => {
-        const rm = spawn('docker', ['rm', '-f', serviceName]);
+        const rm = spawn(resolveExtraBinary('docker'), ['rm', '-f', serviceName]);
         rm.on('close', () => res());
       });
 
       // Prepare Run Args
-      const runArgs = ['run', '-d', '--name', serviceName, tag];
+      const runArgs = ['run', '-d', '--name', serviceName];
 
-      // Info: (20251214 - AI) Apply Config via Handler for iSunCoin
+      const dockerOptions: string[] = [];
+      const imageArgs: string[] = [];
+
       if (serviceName === 'iSunCoin') {
         const handlerArgs = await getIsuncoinRunArgs(servicesRoot);
-        runArgs.push(...handlerArgs);
+        imageArgs.push(...handlerArgs);
       } else if (serviceName === 'SwarmStorage') {
-        // Map required ports for SwarmStorage (API, IPFS Swarm, IPFS API, IPFS Gateway)
-        runArgs.push('-p', '10014:10014'); // SwarmStorage API
-        runArgs.push('-p', '4001:4001');   // IPFS Swarm
-        runArgs.push('-p', '5001:5001');   // IPFS API
-        runArgs.push('-p', '8080:8080');   // IPFS Gateway
+        // Info: (20251215 - AI) nothing to do
       }
 
+      // Assemble: docker run [options] image [args]
+      runArgs.push(...dockerOptions, tag, ...imageArgs);
+
       // Run new container
-      const runProcess = spawn('docker', runArgs);
+      const runProcess = spawn(resolveExtraBinary('docker'), runArgs);
       runProcess.stdout.on('data', (d) => console.log(`[Docker Run] ${d}`));
       runProcess.stderr.on('data', (d) => console.error(`[Docker Run Err] ${d}`));
 
@@ -349,7 +387,7 @@ app.whenReady().then(() => {
           // Success
           // Info: (20251214 - AI) Post-start configuration via Handler for iSunCoin
           if (serviceName === 'iSunCoin') {
-            await configureIsuncoinPostStart(servicesRoot);
+            await configureIsuncoinPostStart(servicesRoot, resolveExtraBinary('docker'));
           }
           resolve({ success: true });
         } else {
@@ -523,10 +561,14 @@ app.on('before-quit', async (event) => {
   event.preventDefault(); // Prevent default quit to allow async cleanup
 
   console.log('Cleaning up services before quit...');
-  const servicesPath = path.join(__dirname, '..', 'services');
+  const servicesRoot = path.join(__dirname, '..', 'services');
+
+  // Info: (20251215 - AI) Stop dockerd
+
+
 
   try {
-    const files = await fs.promises.readdir(servicesPath);
+    const files = await fs.promises.readdir(servicesRoot);
     const services = files.filter((f: string) => !f.startsWith('.'));
 
     // Stop all services concurrently
@@ -534,7 +576,7 @@ app.on('before-quit', async (event) => {
       return new Promise<void>((resolve) => {
         console.log(`Stopping service: ${serviceName}...`);
         // Use shorter timeout for faster shutdown
-        const process = spawn('docker', ['stop', '-t', '2', serviceName]);
+        const process = spawn(resolveExtraBinary('docker'), ['stop', '-t', '2', serviceName]);
         process.on('close', (code) => {
           console.log(`Service ${serviceName} stopped with code ${code}`);
           resolve();
