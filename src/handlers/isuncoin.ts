@@ -1,5 +1,5 @@
 
-import { ipcMain } from 'electron';
+import { ipcMain, app } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { spawn } from 'child_process';
@@ -85,7 +85,10 @@ export const registerIsuncoinHandlers = (ipc: typeof ipcMain, servicesPath: stri
   ipc.handle('get-isuncoin-version', async () => {
     try {
       // Info: (20251214 - AI) Use local binary version check instead of docker
-      const binPath = path.resolve('extra/isuncoin');
+      let binPath = path.join(__dirname, '../extra/isuncoin');
+      if (process.env.NODE_ENV === 'production' || app.isPackaged) {
+        binPath = path.join(process.resourcesPath, 'extra/isuncoin');
+      }
 
       return new Promise((resolve) => {
         // Ensure binary is executable (best effort on mac/linux)

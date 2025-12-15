@@ -10,6 +10,8 @@ export const metadata: Metadata = {
 import AuthWrapper from '@/components/auth_wrapper';
 import DockerCheckWrapper from '@/components/docker_check_wrapper';
 
+import DebugConsole from '@/components/debug_console';
+
 export default function RootLayout({
   children,
 }: {
@@ -28,6 +30,7 @@ export default function RootLayout({
                 </div>
               </DockerCheckWrapper>
             </main>
+            <DebugConsole />
           </div>
         </AuthWrapper>
       </body>

@@ -46,6 +46,67 @@ function createWindow() {
   mainWindow.loadURL('https://isuncloud.local/index.html');
 }
 
+// Info: (20251215 - AI) Forward Console Logs to Renderer
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const sendToRenderer = (level: string, args: any[]) => {
+  const wins = BrowserWindow.getAllWindows();
+  wins.forEach(w => {
+    try {
+      w.webContents.send('debug-log-message', {
+        timestamp: new Date().toLocaleTimeString(),
+        level,
+        source: 'main',
+        args
+      });
+    } catch {
+      // Window might be destroyed
+    }
+  });
+};
+
+const originalConsole = {
+  log: console.log,
+  warn: console.warn,
+  error: console.error,
+  info: console.info,
+  debug: console.debug,
+};
+
+console.log = (...args) => {
+  originalConsole.log(...args);
+  sendToRenderer('log', args);
+};
+
+console.warn = (...args) => {
+  originalConsole.warn(...args);
+  sendToRenderer('warn', args);
+};
+
+console.error = (...args) => {
+  originalConsole.error(...args);
+  sendToRenderer('error', args);
+};
+
+console.info = (...args) => {
+  originalConsole.info(...args);
+  sendToRenderer('info', args);
+};
+
+console.debug = (...args) => {
+  originalConsole.debug(...args);
+  sendToRenderer('debug', args);
+};
+
+process.on('uncaughtException', (error) => {
+  originalConsole.error('Uncaught Exception:', error);
+  sendToRenderer('error', ['Uncaught Exception:', error.message, error.stack]);
+});
+
+process.on('unhandledRejection', (reason) => {
+  originalConsole.error('Unhandled Rejection:', reason);
+  sendToRenderer('error', ['Unhandled Rejection:', reason]);
+});
+
 app.whenReady().then(() => {
   const servicesRoot = path.join(__dirname, '..', 'services');
 

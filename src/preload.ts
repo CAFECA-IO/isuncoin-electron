@@ -15,5 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   saveServiceConfig: (name: string, config: any) => ipcRenderer.invoke('save-service-config', name, config),
   getServiceBalance: () => ipcRenderer.invoke('get-isuncoin-balance'),
-  quitApp: () => ipcRenderer.invoke('quit-app')
+  quitApp: () => ipcRenderer.invoke('quit-app'),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onDebugLog: (callback: (data: any) => void) => ipcRenderer.on('debug-log-message', (_event, value) => callback(value))
 });
