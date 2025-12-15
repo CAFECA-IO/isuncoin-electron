@@ -66,8 +66,8 @@ const MyServices: React.FC = () => {
 
   return (
     <div id="view-services" className="view-section">
-      <div className="glass-panel">
-        <table className="service-table">
+      <div>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               <th>Status.</th>

@@ -8,6 +8,7 @@ export const metadata: Metadata = {
 };
 
 import AuthWrapper from '@/components/auth_wrapper';
+import DockerCheckWrapper from '@/components/docker_check_wrapper';
 
 export default function RootLayout({
   children,
@@ -21,9 +22,11 @@ export default function RootLayout({
           <div className="app-container">
             <Sidebar />
             <main className="main-content">
-              <div className="content-area">
-                {children}
-              </div>
+              <DockerCheckWrapper>
+                <div>
+                  {children}
+                </div>
+              </DockerCheckWrapper>
             </main>
           </div>
         </AuthWrapper>

@@ -318,7 +318,6 @@ const ServiceStatus: React.FC = () => {
               {!isTideBit && (
                 <button
                   onClick={() => openSettings(service)}
-                  className="settings-btn"
                   style={{
                     position: 'absolute',
                     top: '10px',

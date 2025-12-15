@@ -1,0 +1,53 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import DockerInstallPrompt from './docker_install_prompt';
+import { Loader2 } from 'lucide-react';
+
+const DockerCheckWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [checking, setChecking] = useState(true);
+  const [hasDocker, setHasDocker] = useState(false);
+
+  const checkDocker = React.useCallback(async () => {
+    if (typeof window !== 'undefined' && window.electronAPI) {
+      try {
+        const result = await window.electronAPI.checkDocker();
+        setHasDocker(result || true);
+      } catch (error) {
+        console.error("Failed to check docker:", error);
+        setHasDocker(false);
+      }
+    } else {
+      // Fallback for development in browser without Electron
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate check delay
+      console.warn("Electron API not available, assuming Docker is present for dev.");
+      setHasDocker(true);
+    }
+    setChecking(false);
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    checkDocker();
+  }, [checkDocker]);
+
+  if (checking) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center bg-gray-900 text-white">
+        <Loader2 className="mb-4 size-10 animate-spin text-blue-500" />
+        <p className="text-gray-400">Checking system requirements...</p>
+      </div>
+    );
+  }
+
+  if (!hasDocker) {
+    return <DockerInstallPrompt onCheckAgain={() => {
+      setChecking(true);
+      checkDocker();
+    }} />;
+  }
+
+  return <>{children}</>;
+};
+
+export default DockerCheckWrapper;

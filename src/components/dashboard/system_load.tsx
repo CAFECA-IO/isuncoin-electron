@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
 
 const BarItem = ({ label, value, color }: { label: string, value: number, color: string }) => (
-  <div className="bar-item" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 1rem' }}>
+  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 1rem' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontFamily: "'Courier New', monospace" }}>
       <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{label}</span>
       <span style={{ color: color, fontWeight: 'bold' }}>{value.toFixed(1)}%</span>
     </div>
-    <div className="bar-bg" style={{ width: '100%', height: '8px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+    <div style={{ width: '100%', height: '8px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', overflow: 'hidden' }}>
       <div
-        className="bar-fill"
         style={{
           width: `${value}%`,
           height: '100%',
@@ -75,7 +74,7 @@ const SystemLoad: React.FC = () => {
   }, []);
 
   return (
-    <div className="system-bars-section" style={{
+    <div style={{
       minHeight: '180px',
       background: 'var(--card-bg)',
       border: '1px solid rgba(0, 229, 255, 0.1)',

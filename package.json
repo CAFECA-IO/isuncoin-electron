@@ -8,7 +8,7 @@
     "dev": "next dev",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "build": "npm run lint &&npm run build:main && npm run build:renderer",
+    "build": "npm run lint && npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "next build",
     "build:win": "npm run build && electron-builder --win",
@@ -61,7 +61,6 @@
   "devDependencies": {
     "@emnapi/runtime": "^1.7.1",
     "@next/eslint-plugin-next": "^16.0.10",
-    "@types/electron": "^1.4.38",
     "@types/node": "^25.0.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
