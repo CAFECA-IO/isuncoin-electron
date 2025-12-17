@@ -18,7 +18,7 @@ export interface IDockerContainer {
 
 export interface IElectronAPI {
   getFlops: () => Promise<{ success: boolean; data?: string; error?: string }>;
-  checkDocker: () => Promise<boolean>;
+  checkDocker: () => Promise<{ installed: boolean; running: boolean }>;
   getSystemStats: () => Promise<ISystemStats | null>;
   getStatsHistory: () => Promise<ISystemStats[]>;
   getDockerContainers: () => Promise<IDockerContainer[]>;

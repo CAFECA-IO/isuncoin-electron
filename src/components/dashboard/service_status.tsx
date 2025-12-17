@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Settings, X, Save } from 'lucide-react';
+import { Settings, X, Save, Power } from 'lucide-react';
 import { IDockerContainer } from '@/types';
 
 const ServiceStatus: React.FC = () => {
@@ -9,6 +9,9 @@ const ServiceStatus: React.FC = () => {
   const [balance, setBalance] = useState<string>('--- ISC');
   const [isuncoinPerf, setIsuncoinPerf] = useState<string>('medium');
   const processingRef = useRef<Set<string>>(new Set());
+
+  // Track services manually stopped by the user to prevent auto-start
+  const [manuallyStopped, setManuallyStopped] = useState<Set<string>>(new Set());
 
   // Config State
   const [selectedService, setSelectedService] = useState<string | null>(null);
@@ -29,7 +32,7 @@ const ServiceStatus: React.FC = () => {
         // Fetch extra info
         if (defined.includes('iSunCoin')) {
           await window.electronAPI.getIsuncoinVersion();
-          // setVersion(ver); // Info: (20251214 - AI) version state usage removed as it was unused locally
+          // setVersion(ver); 
 
           // Get Performance
           const conf = await window.electronAPI.getServiceConfig('iSunCoin');
@@ -49,6 +52,10 @@ const ServiceStatus: React.FC = () => {
         // Auto-start logic (Skip TideBit-DeFi)
         for (const serviceName of defined) {
           if (serviceName === 'TideBit-DeFi') continue; // EXCLUDE TideBit-DeFi
+
+          // INFO: Skip auto-start if user manually stopped it
+          if (manuallyStopped.has(serviceName)) continue;
+
           if (processingRef.current.has(serviceName)) continue;
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -90,7 +97,7 @@ const ServiceStatus: React.FC = () => {
     fetchAndManage();
     const interval = setInterval(fetchAndManage, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [manuallyStopped]);
 
   const getServiceStatus = (serviceName: string) => {
     if (serviceName === 'TideBit-DeFi') return 'COMING SOON';
@@ -139,6 +146,38 @@ const ServiceStatus: React.FC = () => {
     }
   };
 
+  const handleToggleService = async (serviceName: string, currentStatus: string, containerId?: string) => {
+    if (serviceName === 'TideBit-DeFi') return;
+    if (!window.electronAPI) return;
+
+    if (currentStatus === 'RUNNING') {
+      // User wants to STOP
+      // 1. Mark as manually stopped to prevent auto-restart
+      setManuallyStopped(prev => new Set(prev).add(serviceName));
+      // 2. Stop docker container
+      if (containerId) {
+        await window.electronAPI.dockerStop(containerId);
+      }
+    } else {
+      // User wants to START (or re-enable auto-start)
+      // 1. Remove from manually stopped
+      setManuallyStopped(prev => {
+        const next = new Set(prev);
+        next.delete(serviceName);
+        return next;
+      });
+      // 2. Trigger start immediately (Power button feedback)
+      if (containerId) {
+        await window.electronAPI.dockerStart(containerId);
+      } else {
+        // If not deployed or id unknown, let auto-start loop pick it up or deploy
+        if (currentStatus === 'NOT DEPLOYED') {
+          await window.electronAPI.dockerDeploy(serviceName);
+        }
+      }
+    }
+  };
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       {/* Config Modal */}
@@ -166,7 +205,7 @@ const ServiceStatus: React.FC = () => {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
               <h3 style={{ margin: 0, color: 'var(--color-primary)' }}>{selectedService} Settings</h3>
-              <button onClick={closeSettings} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+              <button onClick={closeSettings} aria-label="Close Settings" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
             </div>
@@ -179,6 +218,7 @@ const ServiceStatus: React.FC = () => {
                     <input
                       id="wallet-address"
                       type="text"
+                      aria-label="Wallet Address"
                       value={config.address || ''}
                       onChange={(e) => setConfig({ ...config, address: e.target.value })}
                       style={{
@@ -190,7 +230,6 @@ const ServiceStatus: React.FC = () => {
                         outline: 'none'
                       }}
                       placeholder="Enter wallet address"
-                      aria-label="Wallet Address"
                     />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -289,6 +328,9 @@ const ServiceStatus: React.FC = () => {
         {services.map(service => {
           const status = getServiceStatus(service);
           const isTideBit = service === 'TideBit-DeFi';
+          const container = containers.find(c => c.names === service || c.names.includes(service));
+          const containerId = container?.id;
+          const isManuallyStopped = manuallyStopped.has(service);
 
           return (
             <div key={service} style={{
@@ -314,27 +356,54 @@ const ServiceStatus: React.FC = () => {
                 background: status === 'RUNNING' ? '#00E676' : status === 'STOPPED' ? '#FF3D00' : isTideBit ? '#777' : 'var(--text-secondary)'
               }}></div>
 
-              {/* Settings Gear - Disabled for TideBit */}
+              {/* Action Buttons (Settings + Power) */}
               {!isTideBit && (
-                <button
-                  onClick={() => openSettings(service)}
-                  style={{
-                    position: 'absolute',
-                    top: '10px',
-                    right: '10px',
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    opacity: 0.5,
-                    transition: 'opacity 0.2s',
-                    zIndex: 10
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                  onMouseLeave={(e) => e.currentTarget.style.opacity = '0.5'}
-                >
-                  <Settings size={18} />
-                </button>
+                <div style={{
+                  position: 'absolute',
+                  top: '10px',
+                  right: '10px',
+                  display: 'flex',
+                  gap: '10px',
+                  zIndex: 10
+                }}>
+                  {/* Settings */}
+                  <button
+                    onClick={() => openSettings(service)}
+                    aria-label={`Settings for ${service}`}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      opacity: 0.5,
+                      transition: 'opacity 0.2s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = '0.5'}
+                    title="Settings"
+                  >
+                    <Settings size={18} />
+                  </button>
+
+                  {/* Power Toggle */}
+                  <button
+                    onClick={() => handleToggleService(service, status, containerId)}
+                    aria-label={status === 'RUNNING' ? `Stop ${service}` : `Start ${service}`}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: status === 'RUNNING' ? '#FF3D00' : '#00E676',
+                      cursor: 'pointer',
+                      opacity: 0.7,
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = '0.5'}
+                    title={status === 'RUNNING' ? 'Stop Service' : 'Start Service'}
+                  >
+                    <Power size={18} />
+                  </button>
+                </div>
               )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
@@ -349,7 +418,7 @@ const ServiceStatus: React.FC = () => {
                     marginTop: '5px',
                     display: 'inline-block'
                   }}>
-                    {status}
+                    {status} {isManuallyStopped && '(OFF)'}
                   </span>
                 </div>
                 <div style={{ opacity: 0.5 }}>
@@ -373,7 +442,7 @@ const ServiceStatus: React.FC = () => {
                   </>
                 )}
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                  {isTideBit ? 'Coming Soon' : (status === 'RUNNING' ? 'Service Active' : 'Auto-starting...')}
+                  {isTideBit ? 'Coming Soon' : (isManuallyStopped ? 'Manually Stopped' : (status === 'RUNNING' ? 'Service Active' : 'Auto-starting...'))}
                 </div>
               </div>
             </div>

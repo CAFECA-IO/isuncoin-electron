@@ -150,12 +150,33 @@ app.whenReady().then(() => {
 
   ipcMain.handle('check-docker', async () => {
     return new Promise((resolve) => {
-      const process = spawn(resolveExtraBinary('docker'), ['--version']);
-      process.on('close', (code) => {
-        resolve(code === 0);
+      // Check 1: Is Docker Installed? (docker --version)
+      const versionProcess = spawn(resolveExtraBinary('docker'), ['--version']);
+
+      let versionCheckSuccess = false;
+
+      versionProcess.on('close', (code) => {
+        versionCheckSuccess = code === 0;
+
+        if (!versionCheckSuccess) {
+          return resolve({ installed: false, running: false });
+        }
+
+        // Check 2: Is Docker Running? (docker info)
+        const infoProcess = spawn(resolveExtraBinary('docker'), ['info']);
+
+        infoProcess.on('close', (infoCode) => {
+          resolve({ installed: true, running: infoCode === 0 });
+        });
+
+        infoProcess.on('error', () => {
+          // Binary exists (version worked), but info failed execution? Unlikely but possible.
+          resolve({ installed: true, running: false });
+        });
       });
-      process.on('error', () => {
-        resolve(false);
+
+      versionProcess.on('error', () => {
+        resolve({ installed: false, running: false });
       });
     });
   });

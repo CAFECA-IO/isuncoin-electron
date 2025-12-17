@@ -99,15 +99,15 @@ const MyServices: React.FC = () => {
                     <td>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         {s.isRunning ? (
-                          <button className="btn-action stop" onClick={() => handleAction('stop', idOrName)} disabled={loading}>
+                          <button className="btn-action stop" onClick={() => handleAction('stop', idOrName)} disabled={loading} style={{ cursor: 'pointer' }}>
                             <Square size={14} fill="currentColor" />
                           </button>
                         ) : (
-                          <button className="btn-action start" onClick={() => handleAction(s.container ? 'start' : 'deploy', idOrName)} disabled={loading}>
+                          <button className="btn-action start" onClick={() => handleAction(s.container ? 'start' : 'deploy', idOrName)} disabled={loading} style={{ cursor: 'pointer' }}>
                             <Play size={14} fill="currentColor" />
                           </button>
                         )}
-                        <button className="btn-action delete" disabled>
+                        <button className="btn-action delete" disabled style={{ cursor: 'not-allowed', opacity: 0.5 }}>
                           <Trash2 size={14} />
                         </button>
                       </div>

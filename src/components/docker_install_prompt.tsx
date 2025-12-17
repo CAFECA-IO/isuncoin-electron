@@ -3,7 +3,7 @@
 import React from 'react';
 import { Download, RefreshCw, XCircle } from 'lucide-react';
 
-const DockerInstallPrompt: React.FC<{ onCheckAgain: () => void }> = ({ onCheckAgain }) => {
+const DockerInstallPrompt: React.FC<{ onCheckAgain: () => void; mode: 'install' | 'start' }> = ({ onCheckAgain, mode }) => {
   const handleDownload = () => {
     window.open('https://www.docker.com/products/docker-desktop/', '_blank');
   };
@@ -13,6 +13,8 @@ const DockerInstallPrompt: React.FC<{ onCheckAgain: () => void }> = ({ onCheckAg
       await window.electronAPI.quitApp();
     }
   };
+
+  const isInstallMode = mode === 'install';
 
   return (
     <div className="flex h-screen flex-col items-center justify-center bg-gray-900 p-8 text-white">
@@ -32,32 +34,38 @@ const DockerInstallPrompt: React.FC<{ onCheckAgain: () => void }> = ({ onCheckAg
           </div>
         </div>
 
-        <h2 className="mb-4 text-2xl font-bold">Docker Required</h2>
+        <h2 className="mb-4 text-2xl font-bold">
+          {isInstallMode ? 'Docker Required' : 'Docker Not Running'}
+        </h2>
 
         <p className="mb-8 leading-relaxed text-gray-300">
-          iSunCloud requires Docker to run its services. We couldn&apos;t detect a running Docker installation on your system.
+          {isInstallMode
+            ? "iSunCloud requires Docker to run its services. We couldn't detect a Docker installation on your system."
+            : "Docker is installed but is not currently running. Please start Docker Desktop to proceed."}
         </p>
 
         <div className="flex flex-col gap-4">
-          <button
-            onClick={handleDownload}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            <Download size={20} />
-            Download Docker Desktop
-          </button>
+          {isInstallMode && (
+            <button
+              onClick={handleDownload}
+              className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700"
+            >
+              <Download size={20} />
+              Download Docker Desktop
+            </button>
+          )}
 
           <button
             onClick={onCheckAgain}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-600 bg-gray-700 px-4 py-3 font-medium text-white transition-colors hover:bg-gray-600"
+            className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-gray-600 bg-gray-700 px-4 py-3 font-medium text-white transition-colors hover:bg-gray-600 ${!isInstallMode ? 'border-blue-600 bg-blue-600 hover:border-blue-700 hover:bg-blue-700' : ''}`}
           >
             <RefreshCw size={20} />
-            Check Again
+            {isInstallMode ? 'Check Again' : 'I Have Started Docker'}
           </button>
 
           <button
             onClick={handleQuit}
-            className="flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 font-medium text-red-400 transition-colors hover:bg-red-900/20 hover:text-red-300"
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-3 font-medium text-red-400 transition-colors hover:bg-red-900/20 hover:text-red-300"
           >
             <XCircle size={20} />
             Quit Application
@@ -65,7 +73,7 @@ const DockerInstallPrompt: React.FC<{ onCheckAgain: () => void }> = ({ onCheckAg
         </div>
 
         <p className="mt-6 text-xs text-gray-500">
-          Already installed? Make sure Docker Desktop is currently running.
+          {isInstallMode ? 'Already installed? Make sure Docker Desktop is currently running.' : 'If Docker is already running, try quitting and restarting it.'}
         </p>
       </div>
     </div>
