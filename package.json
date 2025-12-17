@@ -10,12 +10,12 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "prepare:extra": "npx tsx scripts/prepare_extra.ts",
-    "build": "npm run prepare:extra && npm run lint && npm run build:main && npm run build:renderer",
+    "build": "npm run lint && npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "next build",
-    "build:windows": "npm run build && electron-builder --win",
-    "build:mac": "npm run build && electron-builder --mac",
-    "build:linux": "npm run build && electron-builder --linux"
+    "build:windows": "npm run prepare:extra windows && npm run build && electron-builder --win",
+    "build:mac": "npm run prepare:extra mac && npm run build && electron-builder --mac",
+    "build:linux": "npm run prepare:extra linux && npm run build && electron-builder --linux"
   },
   "build": {
     "appId": "com.cafeca.isuncloud",

@@ -3,13 +3,20 @@ import * as path from 'path';
 
 const rootDir = path.resolve(__dirname, '..');
 const extraDir = path.join(rootDir, 'extra');
-
-const platform = process.platform;
+const platform = process.argv[2] || 'mac';
 let sourceDirName: string | undefined;
 
-if (platform === 'darwin') {
+// Info: (20251217 - Luphia) 清空 extra 目錄下的檔案
+if (fs.existsSync(extraDir)) {
+  fs.readdirSync(extraDir).forEach((file) => {
+    console.log(`Removing ${file} from extra/`);
+    fs.unlinkSync(path.join(extraDir, file));
+  });
+}
+
+if (platform === 'mac') {
   sourceDirName = 'extra_mac';
-} else if (platform === 'win32') {
+} else if (platform === 'windows') {
   sourceDirName = 'extra_windows';
 } else if (platform === 'linux') {
   sourceDirName = 'extra_linux';
@@ -36,14 +43,15 @@ for (const file of files) {
   const srcFile = path.join(sourceDir, file);
   const destFile = path.join(extraDir, file);
 
-  if (fs.lstatSync(srcFile).isDirectory()) {
+  // Info: (20251217 - Luphia) 跳過目錄, .DS_Store
+  if (fs.lstatSync(srcFile).isDirectory() || file === '.DS_Store') {
     continue;
   }
 
   try {
     fs.copyFileSync(srcFile, destFile);
     // Ensure executable
-    if (platform !== 'win32') {
+    if (platform !== 'windows') {
       fs.chmodSync(destFile, '755');
     }
     console.log(`Copied ${file} to extra/`);
