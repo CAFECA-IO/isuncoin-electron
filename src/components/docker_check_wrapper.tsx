@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import DockerInstallPrompt from './docker_install_prompt';
+import DockerInstallPrompt from '@/components/docker_install_prompt';
 import { Loader2 } from 'lucide-react';
 
 const DockerCheckWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {

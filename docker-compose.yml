@@ -1,0 +1,45 @@
+
+
+services:
+  isuncoin:
+    image: isuncoin:latest
+    build:
+      context: ./services/iSunCoin
+      dockerfile: Dockerfile
+    hostname: isuncoin
+    container_name: iSunCoin
+    init: true
+    restart: unless-stopped
+
+  tidebit:
+    build:
+      context: ./services/TideBit
+      dockerfile: Dockerfile
+      args:
+        BRANCH: ${TIDEBIT_BRANCH:-main}
+    container_name: TideBit
+    hostname: tidebit
+    image: tidebit:latest
+    init: true
+    restart: unless-stopped
+    networks:
+      default: null
+  storage:
+    image: swarmstorage:latest
+    build:
+      context: ./services/Storage
+      dockerfile: Dockerfile
+    hostname: storage
+    container_name: Storage
+    init: true
+    restart: unless-stopped
+
+  gateway:
+    image: nginx:alpine
+    container_name: iSunCloud-Gateway
+    init: true
+    volumes:
+      - ./services/Gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    restart: unless-stopped

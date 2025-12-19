@@ -9,12 +9,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dockerStart: (id: string) => ipcRenderer.invoke('docker-start', id),
   dockerStop: (id: string) => ipcRenderer.invoke('docker-stop', id),
   dockerDeploy: (name: string) => ipcRenderer.invoke('docker-deploy', name),
+  dockerReset: (name: string) => ipcRenderer.invoke('docker-reset', name),
   getIsuncoinVersion: () => ipcRenderer.invoke('get-isuncoin-version'),
   getStatsHistory: () => ipcRenderer.invoke('get-stats-history'),
   getServiceConfig: (name: string) => ipcRenderer.invoke('get-service-config', name),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   saveServiceConfig: (name: string, config: any) => ipcRenderer.invoke('save-service-config', name, config),
   getServiceBalance: () => ipcRenderer.invoke('get-isuncoin-balance'),
+  openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
   quitApp: () => ipcRenderer.invoke('quit-app'),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onDebugLog: (callback: (data: any) => void) => ipcRenderer.on('debug-log-message', (_event, value) => callback(value))

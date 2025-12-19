@@ -142,11 +142,11 @@ export const getIsuncoinRunArgs = async (servicesPath: string): Promise<string[]
     const content = await fs.promises.readFile(configPath, 'utf-8');
     const config = JSON.parse(content);
 
-    const args = ['isuncoin']; // Entrypoint replacement
+    const args = ['isuncoin', '--http', '--http.port', '8545', '--http.addr', '0.0.0.0', '--http.vhosts', '*', '--http.corsdomain', '*']; // Entrypoint replacement
 
     if (config.address && config.address.startsWith('0x')) {
       args.push(`--miner.etherbase=${config.address}`);
-      args.push('--exec', 'miner.start()');
+      args.push('--exec', '"miner.start()"');
     }
 
     if (config.performance) {

@@ -100,7 +100,7 @@ const tslintConfigs = [
 
       'no-restricted-imports': [
         'error',
-        { patterns: [{ group: ['../*'], message: "請使用 '@/' 路徑別名取代相對路徑 '..'" }] },
+        { patterns: [{ group: ['../*', './*'], message: "請使用 '@/' 路徑別名取代相對路徑" }] },
       ],
 
       'jsx-a11y/click-events-have-key-events': 'warn',

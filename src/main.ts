@@ -1,10 +1,12 @@
-import { app, BrowserWindow, ipcMain, protocol, net, Tray, nativeImage, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, net, Tray, nativeImage, Menu, shell } from 'electron';
 import * as path from 'path';
-import * as os from 'os';
+
 import * as fs from 'fs';
 import { spawn, execSync } from 'child_process';
 import * as si from 'systeminformation';
-import { registerIsuncoinHandlers, getIsuncoinRunArgs, configureIsuncoinPostStart } from './handlers/isuncoin';
+import { registerIsuncoinHandlers } from '@/handlers/isuncoin';
+import { registerDockerHandlers, stopAllServices, resetService } from '@/handlers/docker';
+import { registerGatewayHandlers } from '@/handlers/gateway';
 
 // Info: (20251215 - AI) Binary Resolution Helper
 const resolveExtraBinary = (name: string): string => {
@@ -147,39 +149,14 @@ app.whenReady().then(() => {
 
   // Register Service Handlers
   registerIsuncoinHandlers(ipcMain, servicesRoot, resolveExtraBinary('docker'));
+  registerDockerHandlers(ipcMain, servicesRoot, resolveExtraBinary('docker'));
+  registerGatewayHandlers(ipcMain);
 
-  ipcMain.handle('check-docker', async () => {
-    return new Promise((resolve) => {
-      // Check 1: Is Docker Installed? (docker --version)
-      const versionProcess = spawn(resolveExtraBinary('docker'), ['--version']);
-
-      let versionCheckSuccess = false;
-
-      versionProcess.on('close', (code) => {
-        versionCheckSuccess = code === 0;
-
-        if (!versionCheckSuccess) {
-          return resolve({ installed: false, running: false });
-        }
-
-        // Check 2: Is Docker Running? (docker info)
-        const infoProcess = spawn(resolveExtraBinary('docker'), ['info']);
-
-        infoProcess.on('close', (infoCode) => {
-          resolve({ installed: true, running: infoCode === 0 });
-        });
-
-        infoProcess.on('error', () => {
-          // Binary exists (version worked), but info failed execution? Unlikely but possible.
-          resolve({ installed: true, running: false });
-        });
-      });
-
-      versionProcess.on('error', () => {
-        resolve({ installed: false, running: false });
-      });
-    });
+  ipcMain.handle('docker-reset', async (_event, name) => {
+    return await resetService(name, servicesRoot, resolveExtraBinary('docker'));
   });
+
+
 
   ipcMain.handle('quit-app', () => {
     app.quit();
@@ -240,207 +217,18 @@ app.whenReady().then(() => {
     return statsHistory;
   });
 
-  ipcMain.handle('get-docker-containers', async () => {
-    return new Promise((resolve) => {
-      // Info: (20251213 - AI) Output format: ID::Image::Names::Status::Ports
-      const process = spawn(resolveExtraBinary('docker'), ['ps', '-a', '--format', '{{.ID}}::{{.Image}}::{{.Names}}::{{.Status}}::{{.Ports}}']);
-      let data = '';
-
-      process.stdout.on('data', (chunk) => {
-        data += chunk.toString();
-      });
-
-      process.on('close', (code) => {
-        if (code !== 0) {
-          resolve([]);
-          return;
-        }
-        const lines = data.split('\n').filter(line => line.trim() !== '');
-        const containers = lines.map(line => {
-          const [id, image, names, status, ports] = line.split('::');
-          return { id, image, names, status, ports };
-        });
-        resolve(containers);
-      });
-
-      process.on('error', () => {
-        resolve([]);
-      });
-    });
+  ipcMain.handle('open-external', async (event, url) => {
+    await shell.openExternal(url);
   });
 
-  ipcMain.handle('get-defined-services', async () => {
-    // Info: (20251213 - AI) Scan services/ directory for available service definitions
-    try {
-      const files: string[] = await fs.promises.readdir(servicesRoot);
-      const serviceNames = files.filter((f: string) => !f.startsWith('.'));
 
-      // Info: (20251214 - AI) Sort services: with Dockerfile first, then without (e.g. placeholders)
-      const servicesWithStatus = await Promise.all(serviceNames.map(async (name) => {
-        const dockerfilePath = path.join(servicesRoot, name, 'Dockerfile');
-        let hasDockerfile = false;
-        try {
-          await fs.promises.access(dockerfilePath);
-          hasDockerfile = true;
-        } catch { }
-        return { name, hasDockerfile };
-      }));
 
-      servicesWithStatus.sort((a, b) => {
-        if (a.hasDockerfile && !b.hasDockerfile) return -1;
-        if (!a.hasDockerfile && b.hasDockerfile) return 1;
-        return a.name.localeCompare(b.name); // Alphabetical tie-break
-      });
 
-      return servicesWithStatus.map(s => s.name);
-    } catch (error) {
-      console.error('Error reading services directory:', error);
-      return [];
-    }
-  });
 
-  ipcMain.handle('docker-start', async (_event, id) => {
-    return new Promise((resolve) => {
-      const process = spawn(resolveExtraBinary('docker'), ['start', id]);
-      process.on('close', (code) => resolve(code === 0));
-      process.on('error', () => resolve(false));
-    });
-  });
 
-  ipcMain.handle('docker-stop', async (_event, id) => {
-    return new Promise((resolve) => {
-      const process = spawn(resolveExtraBinary('docker'), ['stop', id]);
-      process.on('close', (code) => resolve(code === 0));
-      process.on('error', () => resolve(false));
-    });
-  });
 
-  ipcMain.handle('get-service-config', async (_event, serviceName) => {
-    try {
-      const configPath = path.join(servicesRoot, serviceName, 'config.json');
-      // check if exists
-      try {
-        await fs.promises.access(configPath);
-      } catch {
-        return {}; // Return empty if not exists
-      }
 
-      const content = await fs.promises.readFile(configPath, 'utf-8');
-      try {
-        return JSON.parse(content);
-      } catch (e) {
-        console.error(`Failed to parse config for ${serviceName}:`, e);
-        return {};
-      }
-    } catch (e) {
-      console.error(`Failed to read config for ${serviceName}:`, e);
-      return {};
-    }
-  });
 
-  // Helper: Deploy Service
-  const deployService = async (serviceName: string) => {
-    const servicePath = path.join(servicesRoot, serviceName);
-
-    // Check if Dockerfile exists
-    const dockerfilePath = path.join(servicePath, 'Dockerfile');
-    try {
-      await fs.promises.access(dockerfilePath);
-    } catch {
-      // Info: (20251214 - Luphia) Skip deployment if no Dockerfile
-      return { success: false, error: 'No Dockerfile' };
-    }
-
-    const tag = `${serviceName.toLowerCase()}:latest`;
-
-    console.log(`Building docker image for ${serviceName} with tag ${tag}...`);
-
-    const buildSuccess = await new Promise<boolean>((resolve) => {
-      // Command: docker build -t <tag> <path>
-      // Info: (20251215 - AI) Use isolated config as requested
-      const dockerConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), 'docker-config-'));
-      const processBuild = spawn(resolveExtraBinary('docker'), ['build', '-t', tag, servicePath], {
-        env: { ...process.env, DOCKER_CONFIG: dockerConfigDir }
-      });
-
-      processBuild.stdout.on('data', (data) => console.log(`[Docker Build] ${data}`));
-      processBuild.stderr.on('data', (data) => console.error(`[Docker Build Error] ${data}`));
-
-      processBuild.on('close', (code) => resolve(code === 0));
-      processBuild.on('error', (err) => {
-        console.error('Docker build spawn error:', err);
-        resolve(false);
-      });
-    });
-
-    if (!buildSuccess) return { success: false, error: 'Build failed' };
-
-    return new Promise<{ success: boolean, error?: string }>(async (resolve) => {
-      // Remove existing container
-      await new Promise<void>(res => {
-        const rm = spawn(resolveExtraBinary('docker'), ['rm', '-f', serviceName]);
-        rm.on('close', () => res());
-      });
-
-      // Prepare Run Args
-      const runArgs = ['run', '-d', '--name', serviceName];
-
-      const dockerOptions: string[] = [];
-      const imageArgs: string[] = [];
-
-      if (serviceName === 'iSunCoin') {
-        const handlerArgs = await getIsuncoinRunArgs(servicesRoot);
-        imageArgs.push(...handlerArgs);
-      } else if (serviceName === 'SwarmStorage') {
-        // Info: (20251215 - AI) nothing to do
-      }
-
-      // Assemble: docker run [options] image [args]
-      runArgs.push(...dockerOptions, tag, ...imageArgs);
-
-      // Run new container
-      const runProcess = spawn(resolveExtraBinary('docker'), runArgs);
-      runProcess.stdout.on('data', (d) => console.log(`[Docker Run] ${d}`));
-      runProcess.stderr.on('data', (d) => console.error(`[Docker Run Err] ${d}`));
-
-      runProcess.on('close', async (code) => {
-        if (code === 0) {
-          // Success
-          // Info: (20251214 - AI) Post-start configuration via Handler for iSunCoin
-          if (serviceName === 'iSunCoin') {
-            await configureIsuncoinPostStart(servicesRoot, resolveExtraBinary('docker'));
-          }
-          resolve({ success: true });
-        } else {
-          resolve({ success: false, error: 'Docker run failed' });
-        }
-      });
-      runProcess.on('error', (err) => resolve({ success: false, error: err.message }));
-    });
-  };
-
-  ipcMain.handle('save-service-config', async (_event, serviceName, config) => {
-    try {
-      const configPath = path.join(servicesRoot, serviceName, 'config.json');
-      await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
-
-      // Info: (20251214 - AI) Trigger redeploy to apply new args
-      console.log(`Config saved for ${serviceName}, triggering redeploy...`);
-      const result = await deployService(serviceName);
-
-      if (!result.success) {
-        return { success: true, warning: 'Config saved but redeploy failed: ' + result.error };
-      }
-      return { success: true };
-    } catch (e) {
-      console.error(`Failed to save config for ${serviceName}:`, e);
-      return { success: false, error: (e as Error).message };
-    }
-  });
-
-  ipcMain.handle('docker-deploy', async (_event, serviceName) => {
-    return await deployService(serviceName);
-  });
 
   // Handle Custom Protocol (HTTPS Interception)
   protocol.handle('https', (req) => {
@@ -578,36 +366,18 @@ ipcMain.handle('get-flops', async () => {
 });
 
 
+
 app.on('before-quit', async (event) => {
   event.preventDefault(); // Prevent default quit to allow async cleanup
 
   console.log('Cleaning up services before quit...');
   const servicesRoot = path.join(__dirname, '..', 'services');
 
-  // Info: (20251215 - AI) Stop dockerd
-
-
+  // Info: (20251215 - AI) Stop dockerd (if managed, but we just want to stop services now)
 
   try {
-    const files = await fs.promises.readdir(servicesRoot);
-    const services = files.filter((f: string) => !f.startsWith('.'));
-
-    // Stop all services concurrently
-    await Promise.all(services.map(async (serviceName: string) => {
-      return new Promise<void>((resolve) => {
-        console.log(`Stopping service: ${serviceName}...`);
-        // Use shorter timeout for faster shutdown
-        const process = spawn(resolveExtraBinary('docker'), ['stop', '-t', '2', serviceName]);
-        process.on('close', (code) => {
-          console.log(`Service ${serviceName} stopped with code ${code}`);
-          resolve();
-        });
-        process.on('error', (err) => {
-          console.error(`Failed to stop ${serviceName}:`, err);
-          resolve();
-        });
-      });
-    }));
+    // Info: (20251219 - AI) Use docker-compose down to clean up
+    await stopAllServices(servicesRoot, resolveExtraBinary('docker'));
   } catch (error) {
     console.error('Error during cleanup:', error);
   }

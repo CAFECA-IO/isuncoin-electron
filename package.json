@@ -11,7 +11,7 @@
     "lint:fix": "eslint . --fix",
     "prepare:extra": "npx tsx scripts/prepare_extra.ts",
     "build": "npm run lint && npm run build:main && npm run build:renderer",
-    "build:main": "tsc -p tsconfig.main.json",
+    "build:main": "tsc -p tsconfig.main.json && tsc-alias -p tsconfig.main.json",
     "build:renderer": "next build",
     "build:windows": "npm run prepare:extra windows && npm run build && electron-builder --win",
     "build:mac": "npm run prepare:extra mac && npm run build && electron-builder --mac",
@@ -90,6 +90,7 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "tailwindcss": "^3.4.1",
+    "tsc-alias": "^1.8.16",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.49.0"
   },

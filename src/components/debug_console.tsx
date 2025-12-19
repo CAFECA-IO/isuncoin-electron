@@ -16,8 +16,10 @@ const DebugConsole: React.FC = () => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [logs, setLogs] = useState<ILogEntry[]>([]);
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
 
   useEffect(() => {
+    // ... (console overrides)
     const originalConsole = {
       log: console.log,
       warn: console.warn,
@@ -83,10 +85,17 @@ const DebugConsole: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (isOpen && !isMinimized && logsEndRef.current) {
+    if (isOpen && !isMinimized && logsEndRef.current && isAtBottom) {
       logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [logs, isOpen, isMinimized]);
+  }, [logs, isOpen, isMinimized, isAtBottom]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    // Tolerance of 50px
+    const atBottom = scrollHeight - scrollTop <= clientHeight + 50;
+    setIsAtBottom(atBottom);
+  };
 
   if (!isOpen) {
     return (
@@ -147,8 +156,8 @@ const DebugConsole: React.FC = () => {
         position: 'fixed',
         bottom: '80px',
         right: '20px',
-        width: '500px',
-        height: '300px',
+        width: '640px',
+        height: '480px',
         background: 'rgba(10, 10, 10, 0.95)',
         border: '1px solid #333',
         borderRadius: '8px',
@@ -182,29 +191,32 @@ const DebugConsole: React.FC = () => {
       </div>
 
       {/* Logs Area */}
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '10px',
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        color: '#ccc',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '4px',
-      }}>
+      <div
+        onScroll={handleScroll}
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '10px',
+          fontFamily: 'monospace',
+          fontSize: '11px',
+          color: '#ccc',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px',
+        }}>
         {logs.length === 0 && (
           <div style={{ opacity: 0.3, textAlign: 'center', marginTop: '20px' }}>No logs captured yet.</div>
         )}
         {logs.map((log, index) => (
           <div key={index} style={{
             display: 'flex',
+            alignItems: 'flex-start',
             gap: '8px',
             lineHeight: '1.4',
             borderBottom: '1px solid rgba(255,255,255,0.03)',
             paddingBottom: '2px'
           }}>
-            <span style={{ color: '#666', minWidth: '60px' }}>[{log.timestamp}]</span>
+            <span style={{ color: '#666', width: '130px' }}>[{log.timestamp}]</span>
             <span style={{
               color: log.source === 'main' ? '#c77dff' : '#4ade80',
               fontSize: '10px',
@@ -212,9 +224,9 @@ const DebugConsole: React.FC = () => {
               borderRadius: '3px',
               padding: '0 4px',
               height: 'fit-content',
-              alignSelf: 'center',
+              marginTop: '2px',
               marginRight: '4px',
-              minWidth: '35px',
+              width: '35px',
               textAlign: 'center'
             }}>
               {log.source === 'main' ? 'MAIN' : 'REND'}
@@ -222,10 +234,10 @@ const DebugConsole: React.FC = () => {
             <span style={{
               color: log.level === 'error' ? '#ff4d4d' : log.level === 'warn' ? '#ffca28' : log.level === 'info' ? '#4fc3f7' : '#999',
               textTransform: 'uppercase',
-              minWidth: '40px',
+              width: '40px',
               fontWeight: 'bold'
             }}>{log.level}</span>
-            <span style={{ wordBreak: 'break-all', whiteSpace: 'pre-wrap', color: log.level === 'error' ? '#ff8a80' : '#ddd' }}>
+            <span style={{ width: '100%', wordBreak: 'break-all', whiteSpace: 'pre-wrap', color: log.level === 'error' ? '#ff8a80' : '#ddd' }}>
               {log.args.map(arg => {
                 if (typeof arg === 'object') {
                   try {
