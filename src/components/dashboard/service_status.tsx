@@ -8,7 +8,7 @@ const ServiceStatus: React.FC = () => {
   // const [version, setVersion] = useState<string>('Loading...');
   const [balance, setBalance] = useState<string>('--- ISC');
   const [isuncoinPerf, setIsuncoinPerf] = useState<string>('medium');
-  const [ollamaModel, setOllamaModel] = useState<string>('llama2');
+  const [ollamaModel, setOllamaModel] = useState<string>('gemma3:4b');
   const processingRef = useRef<Set<string>>(new Set());
 
   // Track services manually stopped by the user to prevent auto-start
@@ -56,7 +56,7 @@ const ServiceStatus: React.FC = () => {
 
         if (defined.includes('Ollama')) {
           const conf = await window.electronAPI.getServiceConfig('Ollama');
-          setOllamaModel((conf.model as string) || 'llama2');
+          setOllamaModel((conf.model as string) || 'gemma3:4b');
         }
 
         // Auto-start logic (Skip TideBit-DeFi)
@@ -133,7 +133,7 @@ const ServiceStatus: React.FC = () => {
         if (!loadedConfig.branch) loadedConfig.branch = 'main';
       }
       if (serviceName === 'Ollama') {
-        if (!loadedConfig.model) loadedConfig.model = 'llama2';
+        if (!loadedConfig.model) loadedConfig.model = 'gemma3:4b';
       }
       setConfig(loadedConfig);
     } catch (e) {

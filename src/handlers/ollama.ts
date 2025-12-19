@@ -27,6 +27,8 @@ export const handleOllamaChat = async (event: IpcMainEvent, payload: { model: st
     const reader = response.body.getReader();
     const decoder = new TextDecoder('utf-8');
 
+    let buffer = '';
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
@@ -35,9 +37,14 @@ export const handleOllamaChat = async (event: IpcMainEvent, payload: { model: st
       }
 
       const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\n').filter(line => line.trim() !== '');
+      buffer += chunk;
+
+      const lines = buffer.split('\n');
+      // Keep the last line in the buffer if it's incomplete
+      buffer = lines.pop() || '';
 
       for (const line of lines) {
+        if (!line.trim()) continue;
         try {
           const json = JSON.parse(line);
           if (json.message) {
@@ -46,11 +53,8 @@ export const handleOllamaChat = async (event: IpcMainEvent, payload: { model: st
               done: json.done
             });
           }
-          if (json.done) {
-            // Will break in next loop iteration or when reader is done, but explicit send safe
-          }
         } catch (e) {
-          console.error('Error parsing ollama chunk', e);
+          console.warn('Error parsing ollama json line, skipping:', line, e);
         }
       }
     }

@@ -20,7 +20,7 @@ export const registerIsuncoinHandlers = (ipc: typeof ipcMain, servicesPath: stri
         const config = JSON.parse(content);
         address = config.address;
       } catch {
-        return '--- ISC'; // No config or invalid
+        return '--- ISC';
       }
 
       if (!address || !address.startsWith('0x')) {
@@ -137,6 +137,7 @@ export const registerIsuncoinHandlers = (ipc: typeof ipcMain, servicesPath: stri
 };
 
 export const getIsuncoinRunArgs = async (servicesPath: string): Promise<string[]> => {
+  console.log(`[iSunCoin Handler] Getting run args...`);
   try {
     const configPath = path.join(servicesPath, SERVICE_NAME, 'config.json');
     const content = await fs.promises.readFile(configPath, 'utf-8');
@@ -146,7 +147,6 @@ export const getIsuncoinRunArgs = async (servicesPath: string): Promise<string[]
 
     if (config.address && config.address.startsWith('0x')) {
       args.push(`--miner.etherbase=${config.address}`);
-      args.push('--exec', '"miner.start()"');
     }
 
     if (config.performance) {
@@ -167,14 +167,18 @@ export const getIsuncoinRunArgs = async (servicesPath: string): Promise<string[]
 };
 
 export const configureIsuncoinPostStart = async (servicesPath: string, dockerBin: string) => {
+  console.log(`[iSunCoin Handler] Configuring post-start...`);
   try {
     const configPath = path.join(servicesPath, SERVICE_NAME, 'config.json');
     const content = await fs.promises.readFile(configPath, 'utf-8');
     const config = JSON.parse(content);
+    let threads = 5; // Default medium
+    if (config.performance === 'low') threads = 1;
+    else if (config.performance === 'high') threads = 10;
 
     if (config.address && config.address.startsWith('0x')) {
       console.log(`[iSunCoin Handler] Setting miner etherbase to ${config.address}...`);
-      spawn(dockerBin, ['exec', CONTAINER_NAME, 'isuncoin', 'attach', '--exec', `miner.setEtherbase('${config.address}')`]);
+      await spawn(dockerBin, ['exec', CONTAINER_NAME, 'isuncoin', 'attach', '--exec', `"miner.setEtherbase('${config.address}') && miner.start(${threads})"`]);
     }
   } catch (e) {
     console.error('Failed to apply post-start config:', e);

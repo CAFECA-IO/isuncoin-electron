@@ -1,12 +1,10 @@
-
-
 services:
   gateway:
     image: nginx:alpine
-    container_name: iSunCloud-Gateway
+    container_name: Gateway
     init: true
     volumes:
-      - ./services/Gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./Gateway/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "80:80"
     restart: unless-stopped
@@ -14,16 +12,21 @@ services:
   isuncoin:
     image: isuncoin:latest
     build:
-      context: ./services/iSunCoin
+      context: ./iSunCoin
       dockerfile: Dockerfile
     hostname: isuncoin
     container_name: iSunCoin
+    entrypoint: ${ISUNCOIN_CMD}
     init: true
+    volumes:
+      - isuncoin:/root/.ethereum
+    ports:
+      - "30303:30303"
     restart: unless-stopped
 
   tidebit:
     build:
-      context: ./services/TideBit
+      context: ./TideBit
       dockerfile: Dockerfile
       args:
         BRANCH: ${TIDEBIT_BRANCH:-main}
@@ -34,19 +37,24 @@ services:
     restart: unless-stopped
     networks:
       default: null
+
   storage:
     image: swarmstorage:latest
     build:
-      context: ./services/Storage
+      context: ./Storage
       dockerfile: Dockerfile
     hostname: storage
     container_name: Storage
     init: true
+    volumes:
+      - swarmstorage:/root/.ipfs
+    environment:
+      - IPFS_PATH=/root/.ipfs
     restart: unless-stopped
 
   ollama:
     build:
-      context: ./services/Ollama
+      context: ./Ollama
       dockerfile: Dockerfile
     image: ollama:latest
     container_name: Ollama
@@ -61,3 +69,5 @@ services:
 
 volumes:
   ollama:
+  isuncoin:
+  swarmstorage:

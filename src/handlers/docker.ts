@@ -8,7 +8,7 @@ import { getIsuncoinRunArgs, configureIsuncoinPostStart } from '@/handlers/isunc
 const getDefinedComposeServices = async (servicesPath: string, dockerBin: string): Promise<string[]> => {
   return new Promise((resolve) => {
     const process = spawn(dockerBin, ['compose', 'config', '--services'], {
-      cwd: path.join(servicesPath, '..')
+      cwd: servicesPath
     });
     let output = '';
     process.stdout.on('data', (d) => output += d.toString());
@@ -88,7 +88,7 @@ export const deployService = async (serviceName: string, servicesPath: string, d
     console.log(`[${serviceName}] Executing: docker ${composeArgs.join(' ')}`);
 
     const runProcess = spawn(dockerBin, composeArgs, {
-      cwd: path.join(servicesPath, '..'),
+      cwd: servicesPath,
       env
     });
 
@@ -115,14 +115,13 @@ export const deployService = async (serviceName: string, servicesPath: string, d
 };
 
 export const resetService = async (serviceName: string, servicesPath: string, dockerBin: string): Promise<{ success: boolean; error?: string }> => {
-  const projectRoot = path.dirname(servicesPath);
   const composeService = serviceName.toLowerCase();
 
   // 1. Get Image ID (before removal)
   let imageId = '';
   try {
     // Info: (20251219 - AI) capture image ID to remove it later
-    const output = execSync(`"${dockerBin}" compose images -q ${composeService}`, { cwd: projectRoot }).toString().trim();
+    const output = execSync(`"${dockerBin}" compose images -q ${composeService}`, { cwd: servicesPath }).toString().trim();
     if (output) {
       // If multiple lines (unexpected for single service but possible), take unique ones
       imageId = output.split('\n')[0].trim();
@@ -137,7 +136,7 @@ export const resetService = async (serviceName: string, servicesPath: string, do
     console.log(`[${serviceName}] Resetting: Stopping and removing...`);
     // 'rm -f -s -v': force, stop if running, remove anonymous volumes
     const cmd = `"${dockerBin}" compose rm -f -s -v ${composeService}`;
-    execSync(cmd, { cwd: projectRoot });
+    execSync(cmd, { cwd: servicesPath });
     console.log(`[${serviceName}] Service removed.`);
   } catch (error) {
     console.warn(`[${serviceName}] Warning during reset removal: ${(error as Error).message}`);
@@ -148,7 +147,7 @@ export const resetService = async (serviceName: string, servicesPath: string, do
     try {
       console.log(`[${serviceName}] Removing image ${imageId}...`);
       const cmd = `"${dockerBin}" rmi ${imageId}`;
-      execSync(cmd, { cwd: projectRoot });
+      execSync(cmd, { cwd: servicesPath });
       console.log(`[${serviceName}] Image ${imageId} removed.`);
     } catch (error) {
       console.warn(`[${serviceName}] Warning: Failed to remove image ${imageId}: ${(error as Error).message}`);
@@ -206,8 +205,10 @@ export const registerDockerHandlers = (ipc: typeof ipcMain, servicesPath: string
   ipc.handle('get-defined-services', async () => {
     // Info: (20251219 - AI) Scan services/ directory for available service definitions
     try {
-      const files: string[] = await fs.promises.readdir(servicesPath);
-      const serviceNames = files.filter((f: string) => !f.startsWith('.'));
+      const files = await fs.promises.readdir(servicesPath, { withFileTypes: true });
+      const serviceNames = files
+        .filter(dirent => dirent.isDirectory() && !dirent.name.startsWith('.'))
+        .map(dirent => dirent.name);
 
       const servicesWithStatus = await Promise.all(serviceNames.map(async (name) => {
         const dockerfilePath = path.join(servicesPath, name, 'Dockerfile');
@@ -312,7 +313,7 @@ export const stopAllServices = async (servicesPath: string, dockerBin: string) =
   console.log('[Docker Handler] Stopping all services via docker-compose down...');
   return new Promise<void>((resolve) => {
     const process = spawn(dockerBin, ['compose', 'down'], {
-      cwd: path.join(servicesPath, '..')
+      cwd: servicesPath
     });
 
     process.on('close', (code) => {

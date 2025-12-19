@@ -96,6 +96,7 @@
   },
   "dependencies": {
     "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "systeminformation": "^5.27.13"
   }
 }
