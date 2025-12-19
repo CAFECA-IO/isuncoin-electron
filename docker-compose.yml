@@ -1,6 +1,16 @@
 
 
 services:
+  gateway:
+    image: nginx:alpine
+    container_name: iSunCloud-Gateway
+    init: true
+    volumes:
+      - ./services/Gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    restart: unless-stopped
+
   isuncoin:
     image: isuncoin:latest
     build:
@@ -34,12 +44,20 @@ services:
     init: true
     restart: unless-stopped
 
-  gateway:
-    image: nginx:alpine
-    container_name: iSunCloud-Gateway
-    init: true
+  ollama:
+    build:
+      context: ./services/Ollama
+      dockerfile: Dockerfile
+    image: ollama:latest
+    container_name: Ollama
+    hostname: ollama
     volumes:
-      - ./services/Gateway/nginx.conf:/etc/nginx/nginx.conf:ro
-    ports:
-      - "80:80"
+      - ollama:/root/.ollama
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:4b}
+    networks:
+      default: null
     restart: unless-stopped
+
+volumes:
+  ollama:

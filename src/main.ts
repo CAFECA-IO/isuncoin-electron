@@ -138,7 +138,7 @@ process.on('unhandledRejection', (reason) => {
   sendToRenderer('error', ['Unhandled Rejection:', reason]);
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   let servicesRoot = path.join(__dirname, '..', 'services');
   if (app.isPackaged) {
     servicesRoot = path.join(process.resourcesPath, 'services');
@@ -152,9 +152,13 @@ app.whenReady().then(() => {
   registerDockerHandlers(ipcMain, servicesRoot, resolveExtraBinary('docker'));
   registerGatewayHandlers(ipcMain);
 
-  ipcMain.handle('docker-reset', async (_event, name) => {
-    return await resetService(name, servicesRoot, resolveExtraBinary('docker'));
+  ipcMain.handle('docker-reset', async (_event, serviceName) => {
+    return await resetService(serviceName, servicesRoot, resolveExtraBinary('docker'));
   });
+
+  // Ollama Chat
+  const { handleOllamaChat } = await import('@/handlers/ollama');
+  ipcMain.on('ollama-chat', handleOllamaChat);
 
 
 
@@ -219,6 +223,15 @@ app.whenReady().then(() => {
 
   ipcMain.handle('open-external', async (event, url) => {
     await shell.openExternal(url);
+  });
+
+  ipcMain.handle('check-url', async (event, url) => {
+    try {
+      const response = await net.fetch(url);
+      return response.ok;
+    } catch {
+      return false;
+    }
   });
 
 

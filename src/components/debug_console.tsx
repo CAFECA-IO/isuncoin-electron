@@ -9,6 +9,7 @@ interface ILogEntry {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   args: any[];
   source?: 'main' | 'renderer';
+  scope?: string;
 }
 
 const DebugConsole: React.FC = () => {
@@ -17,6 +18,10 @@ const DebugConsole: React.FC = () => {
   const [logs, setLogs] = useState<ILogEntry[]>([]);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
+
+  // Tabs Logic
+  const [tabs, setTabs] = useState<string[]>(['All']);
+  const [selectedTab, setSelectedTab] = useState('All');
 
   useEffect(() => {
     // ... (console overrides)
@@ -33,13 +38,35 @@ const DebugConsole: React.FC = () => {
     };
 
     const addLog = (level: ILogEntry['level'], args: unknown[], source: ILogEntry['source'] = 'renderer', timestamp?: string) => {
+      // Parse Scope from first argument if string
+      let scope = source === 'main' ? 'Main' : 'Renderer';
+      const firstArg = args[0];
+      if (typeof firstArg === 'string') {
+        const match = firstArg.match(/^\[([^\]]+)\]/);
+        if (match) {
+          scope = match[1];
+        }
+      }
+
       const entry: ILogEntry = {
         timestamp: timestamp || new Date().toLocaleTimeString(),
         level,
         args: formatArgs(args),
         source,
+        scope
       };
-      setLogs((prev) => [...prev.slice(-499), entry]); // Keep last 500
+
+      setLogs((prev) => {
+        const newLogs = [...prev.slice(-499), entry];
+        return newLogs;
+      });
+
+      setTabs(prev => {
+        if (!prev.includes(scope)) {
+          return [...prev, scope];
+        }
+        return prev;
+      });
     };
 
     console.log = (...args) => {
@@ -190,6 +217,35 @@ const DebugConsole: React.FC = () => {
         </div>
       </div>
 
+      {/* Tabs Header */}
+      <div style={{
+        display: 'flex',
+        background: 'rgba(0,0,0,0.3)',
+        borderBottom: '1px solid #333',
+        overflowX: 'auto',
+        scrollbarWidth: 'none'
+      }}>
+        {tabs.map(tab => (
+          <button
+            key={tab}
+            onClick={() => setSelectedTab(tab)}
+            style={{
+              background: selectedTab === tab ? 'rgba(255,255,255,0.1)' : 'transparent',
+              border: 'none',
+              borderRight: '1px solid #333',
+              color: selectedTab === tab ? '#fff' : '#888',
+              padding: '6px 12px',
+              fontSize: '11px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              fontFamily: 'monospace'
+            }}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
       {/* Logs Area */}
       <div
         onScroll={handleScroll}
@@ -207,7 +263,7 @@ const DebugConsole: React.FC = () => {
         {logs.length === 0 && (
           <div style={{ opacity: 0.3, textAlign: 'center', marginTop: '20px' }}>No logs captured yet.</div>
         )}
-        {logs.map((log, index) => (
+        {logs.filter(log => selectedTab === 'All' || log.scope === selectedTab).map((log, index) => (
           <div key={index} style={{
             display: 'flex',
             alignItems: 'flex-start',
@@ -231,6 +287,29 @@ const DebugConsole: React.FC = () => {
             }}>
               {log.source === 'main' ? 'MAIN' : 'REND'}
             </span>
+            {/* Scope Badge (if different from Main/Rend default concept, or just show text) 
+                Actually user probably wants to see the scope as the primary tag now?
+                The 'MAIN' / 'REND' tag is still useful for process origin.
+                Let's add a scope tag if it's special (Service).
+
+            <span style={{
+              color: '#fff',
+              fontSize: '10px',
+              background: '#333',
+              borderRadius: '3px',
+              padding: '0 4px',
+              height: 'fit-content',
+              marginTop: '2px',
+              marginRight: '4px',
+              width: 'fit-content',
+              minWidth: '35px',
+              textAlign: 'center'
+            }}>
+              {log.scope?.substring(0, 10)}
+            </span>
+
+            */}
+
             <span style={{
               color: log.level === 'error' ? '#ff4d4d' : log.level === 'warn' ? '#ffca28' : log.level === 'info' ? '#4fc3f7' : '#999',
               textTransform: 'uppercase',

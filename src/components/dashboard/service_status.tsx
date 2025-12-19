@@ -8,6 +8,7 @@ const ServiceStatus: React.FC = () => {
   // const [version, setVersion] = useState<string>('Loading...');
   const [balance, setBalance] = useState<string>('--- ISC');
   const [isuncoinPerf, setIsuncoinPerf] = useState<string>('medium');
+  const [ollamaModel, setOllamaModel] = useState<string>('llama2');
   const processingRef = useRef<Set<string>>(new Set());
 
   // Track services manually stopped by the user to prevent auto-start
@@ -51,6 +52,11 @@ const ServiceStatus: React.FC = () => {
           } else {
             setBalance('--- ISC');
           }
+        }
+
+        if (defined.includes('Ollama')) {
+          const conf = await window.electronAPI.getServiceConfig('Ollama');
+          setOllamaModel((conf.model as string) || 'llama2');
         }
 
         // Auto-start logic (Skip TideBit-DeFi)
@@ -125,6 +131,9 @@ const ServiceStatus: React.FC = () => {
       }
       if (serviceName === 'TideBit') {
         if (!loadedConfig.branch) loadedConfig.branch = 'main';
+      }
+      if (serviceName === 'Ollama') {
+        if (!loadedConfig.model) loadedConfig.model = 'llama2';
       }
       setConfig(loadedConfig);
     } catch (e) {
@@ -370,6 +379,29 @@ const ServiceStatus: React.FC = () => {
                     Changing the branch will trigger a rebuild and redeployment of the service.
                   </div>
                 </div>
+              ) : selectedService === 'Ollama' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label htmlFor="ollama-model" style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Model Name</label>
+                  <input
+                    id="ollama-model"
+                    type="text"
+                    aria-label="Model Name"
+                    value={config.model || ''}
+                    onChange={(e) => setConfig({ ...config, model: e.target.value })}
+                    style={{
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      padding: '0.5rem',
+                      borderRadius: '6px',
+                      color: 'var(--text-primary)',
+                      outline: 'none'
+                    }}
+                    placeholder="llama2"
+                  />
+                  <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '4px' }}>
+                    Common models: llama2, mistral, tinyllama. Changing this will trigger a restart.
+                  </div>
+                </div>
               ) : (
                 <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
                   No configurable settings for this service.
@@ -457,6 +489,7 @@ const ServiceStatus: React.FC = () => {
             if (service === 'iSunCoin') url = 'http://isuncoin.localhost';
             if (service === 'Storage') url = 'http://storage.localhost';
             if (service === 'TideBit') url = 'http://tidebit.localhost';
+            if (service === 'Ollama') url = 'http://ollama.localhost';
 
             window.electronAPI.openExternal(url);
           };
@@ -610,6 +643,12 @@ const ServiceStatus: React.FC = () => {
                       </div>
                     )}
                   </>
+                )}
+                {service === 'Ollama' && (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Model:</span>
+                    <span style={{ fontFamily: 'monospace', color: '#B2EBF2' }}>{ollamaModel}</span>
+                  </div>
                 )}
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
                   {isManuallyStopped ? 'Manually Stopped' : (status === 'RUNNING' ? 'Service Active' : 'Auto-starting...')}

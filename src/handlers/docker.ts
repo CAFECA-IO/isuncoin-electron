@@ -38,10 +38,10 @@ export const deployService = async (serviceName: string, servicesPath: string, d
   try {
     await fs.promises.access(dockerfilePath);
   } catch {
-    console.log(`[Docker Handler] No Dockerfile for ${serviceName}, assuming image-based deployment.`);
+    console.log(`[${serviceName}] No Dockerfile, assuming image-based deployment.`);
   }
 
-  console.log(`[Docker Handler] Deploying ${serviceName} using docker-compose...`);
+  console.log(`[${serviceName}] Deploying using docker-compose...`);
 
   return new Promise<{ success: boolean, error?: string, skipped?: boolean }>(async (resolve) => {
     // Info: (20251219 - AI) Prepare Environment Logic
@@ -65,6 +65,17 @@ export const deployService = async (serviceName: string, servicesPath: string, d
       } catch { /* config might not exist yet */ }
     }
 
+    if (serviceName.toLowerCase() === 'ollama') {
+      const configPath = path.join(servicesPath, serviceName, 'config.json');
+      try {
+        const content = await fs.promises.readFile(configPath, 'utf-8');
+        const config = JSON.parse(content);
+        if (config.model) {
+          env.OLLAMA_MODEL = config.model;
+        }
+      } catch { /* config might not exist yet */ }
+    }
+
     // Info: (20251219 - AI) Gateway Env Hook
     if (serviceName.toLowerCase() === 'gateway') {
       const { getGatewayRunArgs } = await import('@/handlers/gateway');
@@ -74,30 +85,30 @@ export const deployService = async (serviceName: string, servicesPath: string, d
 
     const composeArgs = ['compose', 'up', '-d', '--build', serviceName.toLowerCase()];
 
-    console.log(`[Docker Handler] Executing: docker ${composeArgs.join(' ')}`);
+    console.log(`[${serviceName}] Executing: docker ${composeArgs.join(' ')}`);
 
     const runProcess = spawn(dockerBin, composeArgs, {
       cwd: path.join(servicesPath, '..'),
       env
     });
 
-    runProcess.stdout.on('data', (d) => console.log(`[Docker Compose] ${d}`));
-    runProcess.stderr.on('data', (d) => console.error(`[Docker Compose Err] ${d}`));
+    runProcess.stdout.on('data', (d) => console.log(`[${serviceName}] ${d}`));
+    runProcess.stderr.on('data', (d) => console.error(`[${serviceName}] ${d}`));
 
     runProcess.on('close', async (code) => {
       if (code === 0) {
-        console.log(`[Docker Handler] Service ${serviceName} deployed successfully.`);
+        console.log(`[${serviceName}] Service deployed successfully.`);
         if (serviceName === 'iSunCoin') {
           await configureIsuncoinPostStart(servicesPath, dockerBin);
         }
         resolve({ success: true });
       } else {
-        console.error(`[Docker Handler] Service ${serviceName} deployment failed with code ${code}.`);
+        console.error(`[${serviceName}] Deployment failed with code ${code}.`);
         resolve({ success: false, error: 'Docker compose failed' });
       }
     });
     runProcess.on('error', (err) => {
-      console.error(`[Docker Handler] Spawn error for ${serviceName}:`, err);
+      console.error(`[${serviceName}] Spawn error:`, err);
       resolve({ success: false, error: err.message })
     });
   });
@@ -116,35 +127,35 @@ export const resetService = async (serviceName: string, servicesPath: string, do
       // If multiple lines (unexpected for single service but possible), take unique ones
       imageId = output.split('\n')[0].trim();
     }
-    console.log(`[Docker Handler] Found image for ${serviceName}: ${imageId}`);
+    console.log(`[${serviceName}] Found image: ${imageId}`);
   } catch {
-    console.log(`[Docker Handler] Could not determine image for ${serviceName} (might not exist yet).`);
+    console.log(`[${serviceName}] Could not determine image (might not exist yet).`);
   }
 
   // 2. Stop and Remove Container + Volumes
   try {
-    console.log(`[Docker Handler] Resetting service ${serviceName}: Stopping and removing...`);
+    console.log(`[${serviceName}] Resetting: Stopping and removing...`);
     // 'rm -f -s -v': force, stop if running, remove anonymous volumes
     const cmd = `"${dockerBin}" compose rm -f -s -v ${composeService}`;
     execSync(cmd, { cwd: projectRoot });
-    console.log(`[Docker Handler] Service ${serviceName} removed.`);
+    console.log(`[${serviceName}] Service removed.`);
   } catch (error) {
-    console.warn(`[Docker Handler] Warning during reset removal of ${serviceName}: ${(error as Error).message}`);
+    console.warn(`[${serviceName}] Warning during reset removal: ${(error as Error).message}`);
   }
 
   // 3. Remove Image if found
   if (imageId) {
     try {
-      console.log(`[Docker Handler] Removing image ${imageId}...`);
+      console.log(`[${serviceName}] Removing image ${imageId}...`);
       const cmd = `"${dockerBin}" rmi ${imageId}`;
       execSync(cmd, { cwd: projectRoot });
-      console.log(`[Docker Handler] Image ${imageId} removed.`);
+      console.log(`[${serviceName}] Image ${imageId} removed.`);
     } catch (error) {
-      console.warn(`[Docker Handler] Warning: Failed to remove image ${imageId}: ${(error as Error).message}`);
+      console.warn(`[${serviceName}] Warning: Failed to remove image ${imageId}: ${(error as Error).message}`);
     }
   }
 
-  console.log(`[Docker Handler] Redeploying ${serviceName}...`);
+  console.log(`[${serviceName}] Redeploying...`);
   return await deployService(serviceName, servicesPath, dockerBin);
 };
 
@@ -277,7 +288,9 @@ export const registerDockerHandlers = (ipc: typeof ipcMain, servicesPath: string
       const configPath = path.join(servicesPath, serviceName, 'config.json');
       await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
 
-      console.log(`[Docker Handler] Config saved for ${serviceName}, triggering redeploy...`);
+      await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
+
+      console.log(`[${serviceName}] Config saved, triggering redeploy...`);
       const result = await deployService(serviceName, servicesPath, dockerBin);
 
       if (!result.success) {
