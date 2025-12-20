@@ -289,8 +289,6 @@ export const registerDockerHandlers = (ipc: typeof ipcMain, servicesPath: string
       const configPath = path.join(servicesPath, serviceName, 'config.json');
       await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
 
-      await fs.promises.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
-
       console.log(`[${serviceName}] Config saved, triggering redeploy...`);
       const result = await deployService(serviceName, servicesPath, dockerBin);
 
