@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { spawn, execSync } from 'child_process';
 import * as si from 'systeminformation';
-import { registerIsuncoinHandlers } from '@/handlers/isuncoin';
+import { registerIsuncoinHandlers, getIsuncoinNodeInfo } from '@/handlers/isuncoin';
 import { registerDockerHandlers, stopAllServices, resetService } from '@/handlers/docker';
 import { registerGatewayHandlers } from '@/handlers/gateway';
 
@@ -306,6 +306,10 @@ app.whenReady().then(async () => {
     updateFlopsCache();
     // Poll every 5 minutes
     setInterval(updateFlopsCache, 5 * 60 * 1000);
+
+    // Info: (20251221 - AI) Start Node Reporting Loop (every 5 mins)
+    collectAndReportNodeStats();
+    setInterval(collectAndReportNodeStats, 5 * 60 * 1000);
   };
 
   initTray();
@@ -377,6 +381,72 @@ ipcMain.handle('get-flops', async () => {
   await updateFlopsCache();
   return flopsCache;
 });
+
+// Info: (20251221 - AI) Node Reporting Logic
+// --------------------------------------------------------------------------
+const collectAndReportNodeStats = async () => {
+  try {
+    const dockerBin = resolveExtraBinary('docker');
+    const nodeInfo = await getIsuncoinNodeInfo(dockerBin);
+
+    if (!nodeInfo) {
+      console.log('[Node Reporting] Node info not available (container not running?), skipping report.');
+      return;
+    }
+
+    // Reuse existing FLOPs cache
+    let flopsVal = 0;
+    if (flopsCache && flopsCache.success && flopsCache.data) {
+      const match = flopsCache.data.match(/Total Compute Power:\s*([\d.]+)\s*TFLOPS/);
+      if (match) flopsVal = parseFloat(match[1]);
+    }
+
+    // Get System Resources
+    const mem = await si.mem();
+    const fsData = await si.fsSize();
+
+    // Sum total storage from all mounted drives (simplification) or pick main
+    // Let's sum total size of all physical drives or just use main root
+    const totalStorageTb = fsData.reduce((acc, drive) => acc + drive.size, 0) / (1024 * 1024 * 1024 * 1024);
+    const totalRamGb = mem.total / (1024 * 1024 * 1024);
+
+    const payload = {
+      // id: 'optional-uuid', // Server likely generates if missing or we can persist one.
+      // Instructions say "Registers a new node or updates an existing one. Nodes are identified by enode."
+      // So we can omit ID if we rely on enode, or we send a generated/saved uuid if we want strict consistency.
+      // Let's omit ID for now as per "optional-uuid" hint.
+      nodeInfo: {
+        enode: nodeInfo.enode,
+        networkId: nodeInfo.networkId,
+        client: nodeInfo.client
+      },
+      resources: {
+        flops: parseFloat(flopsVal.toFixed(2)),
+        storage: parseFloat(totalStorageTb.toFixed(2)),
+        ram: Math.round(totalRamGb)
+      }
+    };
+
+    console.log('[Node Reporting] Sending report:', JSON.stringify(payload));
+
+    const response = await net.fetch('https://isuncloud.com/api/v1/nodes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (response.ok) {
+      console.log('[Node Reporting] Report sent successfully.');
+    } else {
+      console.error(`[Node Reporting] Failed to send report: ${response.status} ${response.statusText}`);
+    }
+
+  } catch (error) {
+    console.error('[Node Reporting] Error during reporting:', error);
+  }
+};
 
 
 

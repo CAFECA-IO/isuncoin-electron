@@ -8,6 +8,54 @@ const SERVICE_NAME = 'iSunCoin';
 
 const CONTAINER_NAME = 'iSunCoin'; // Name of container matches service name usually
 
+export interface IIsuncoinNodeInfo {
+  enode: string;
+  networkId: number;
+  client: string;
+}
+
+export const getIsuncoinNodeInfo = async (dockerBin: string): Promise<IIsuncoinNodeInfo | null> => {
+  return new Promise((resolve) => {
+    // Info: Executing JSON.stringify(admin.nodeInfo) to get parsable output
+    const cmd = `console.log(JSON.stringify(admin.nodeInfo))`;
+    const process = spawn(dockerBin, ['exec', CONTAINER_NAME, 'isuncoin', 'attach', '--exec', cmd]);
+    let output = '';
+
+    process.stdout.on('data', (data) => output += data.toString());
+
+    process.on('close', (code) => {
+      if (code !== 0) {
+        resolve(null);
+        return;
+      }
+      try {
+        // Clean up output (sometimes has "true" or other console logs)
+        // Find the first '{' and last '}'
+        const str = output.trim();
+        const start = str.indexOf('{');
+        const end = str.lastIndexOf('}');
+        if (start === -1 || end === -1) {
+          resolve(null);
+          return;
+        }
+        const jsonStr = str.substring(start, end + 1);
+        const data = JSON.parse(jsonStr);
+
+        // Extract fields
+        const info: IIsuncoinNodeInfo = {
+          enode: data.enode,
+          networkId: 8017,
+          client: data.name
+        };
+        resolve(info);
+      } catch (e) {
+        console.error('Failed to parse nodeInfo:', e);
+        resolve(null);
+      }
+    });
+  });
+};
+
 export const registerIsuncoinHandlers = (ipc: typeof ipcMain, servicesPath: string, dockerBin: string) => {
 
   ipc.handle('get-isuncoin-balance', async () => {
