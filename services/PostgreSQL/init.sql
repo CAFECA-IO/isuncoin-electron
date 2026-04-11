@@ -1,0 +1,5 @@
+CREATE DATABASE isunfa;
+CREATE DATABASE memory;
+
+\c memory;
+CREATE EXTENSION IF NOT EXISTS vector;

@@ -67,7 +67,24 @@ services:
       default: null
     restart: unless-stopped
 
+  postgresql:
+    image: pgvector/pgvector:pg17
+    container_name: PostgreSQL
+    hostname: postgresql
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - ./PostgreSQL/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - postgresql-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      default: null
+
 volumes:
   ollama:
   isuncoin:
   swarmstorage:
+  postgresql-data:
